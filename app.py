@@ -35,6 +35,8 @@ REGISTER_CODE = os.environ.get('REGISTER_CODE', '')  # empty = open registration
 # ── Global State ───────────────────────────────────────────
 running_bots   = {}
 pending_logins = {}
+activity_log   = []     # [{phone, emoji, msg_id, chat_id, sender, ts}, …]
+MAX_LOG        = 200
 
 
 # ── Storage ────────────────────────────────────────────────
@@ -189,6 +191,17 @@ async def run_bot(phone, session_string):
                 running_bots[phone]['react_count'] = \
                     running_bots[phone].get('react_count', 0) + 1
                 sender = getattr(event, 'sender_id', 'ch')
+                # Log activity
+                activity_log.append({
+                    'phone': phone,
+                    'emoji': cur_reaction,
+                    'msg_id': msg.id,
+                    'chat_id': event.chat_id,
+                    'sender': str(sender),
+                    'ts': datetime.utcnow().isoformat() + 'Z'
+                })
+                if len(activity_log) > MAX_LOG:
+                    activity_log.pop(0)
                 print(f"[{phone}] {cur_reaction} #{msg.id} from={sender}")
             except FloodWaitError as e:
                 print(f"[{phone}] FloodWait {e.seconds}s")
@@ -368,6 +381,65 @@ def api_status():
             'target_count': len(all_targets.get(phone, {})),
         }
     return jsonify(out)
+
+
+@app.route('/api/activity')
+@login_required
+def api_activity():
+    """Recent reaction activity log."""
+    limit = min(int(request.args.get('limit', 50)), MAX_LOG)
+    visible = get_visible_accounts()
+    logs = [e for e in reversed(activity_log) if e['phone'] in visible][:limit]
+    # Enrich with account name
+    accounts = load_accounts()
+    targets  = load_targets()
+    for entry in logs:
+        acc = accounts.get(entry['phone'], {})
+        entry['acc_name'] = acc.get('name', entry['phone'])
+        # Try to resolve target name
+        phone_targets = targets.get(entry['phone'], {})
+        chat_key = str(entry['chat_id'])
+        tgt = phone_targets.get(chat_key, {})
+        entry['target_name'] = tgt.get('name', f"Chat {entry['chat_id']}")
+    return jsonify(logs)
+
+
+@app.route('/api/stats')
+@login_required
+def api_stats():
+    """Aggregate stats for charts."""
+    visible = get_visible_accounts()
+    all_targets = load_targets()
+    # Per-account stats
+    per_acc = {}
+    total_reacted = 0
+    for phone in visible:
+        bot = running_bots.get(phone)
+        rc  = bot.get('react_count', 0) if bot else 0
+        total_reacted += rc
+        acc = visible[phone]
+        per_acc[phone] = {
+            'name':         acc.get('name', phone),
+            'react_count':  rc,
+            'status':       bot['status'] if bot else 'stopped',
+            'target_count': len(all_targets.get(phone, {})),
+        }
+    # Timeline: group activity_log by minute (last 60 min)
+    from collections import defaultdict
+    timeline = defaultdict(int)
+    for entry in activity_log:
+        if entry['phone'] in visible:
+            minute_key = entry['ts'][:16]  # YYYY-MM-DDTHH:MM
+            timeline[minute_key] += 1
+    timeline_sorted = sorted(timeline.items())[-60:]  # last 60 data points
+    return jsonify({
+        'total_accounts':  len(visible),
+        'total_running':   sum(1 for p in visible if running_bots.get(p, {}).get('status') == 'running'),
+        'total_reacted':   total_reacted,
+        'total_targets':   sum(len(all_targets.get(p, {})) for p in visible),
+        'per_account':     per_acc,
+        'timeline':        timeline_sorted,
+    })
 
 
 @app.route('/api/start/<path:phone>', methods=['POST'])
