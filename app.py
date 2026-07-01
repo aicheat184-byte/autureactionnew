@@ -14,20 +14,21 @@ from telethon.errors import (
 )
 
 app = Flask(__name__)
-app.secret_key = 'autoreact-dashboard-2026'
+app.secret_key = 'cheatz-autoreact-2026'
 
 # ── Config ─────────────────────────────────────────────────
 API_ID         = 2040
 API_HASH       = 'b18441a1ff607e10a989891a5462e627'
-TARGET_CHAT_ID = int(os.environ.get('TARGET_CHAT_ID', '-1002199457550'))
+DEFAULT_TARGET = int(os.environ.get('TARGET_CHAT_ID', '-1002199457550'))
 REACTION       = os.environ.get('REACTION', '\U0001f64f')
 DELAY          = float(os.environ.get('DELAY', '0.5'))
 ACCOUNTS_FILE  = 'accounts.json'
+TARGETS_FILE   = 'targets.json'
 PORT           = int(os.environ.get('PORT', 5000))
 
 # ── Global State ───────────────────────────────────────────
-running_bots   = {}   # phone -> {loop, thread, client, status, react_count}
-pending_logins = {}   # phone -> {client, loop}
+running_bots   = {}
+pending_logins = {}
 
 
 # ── Storage ────────────────────────────────────────────────
@@ -39,6 +40,19 @@ def load_accounts():
 
 def save_accounts(data):
     with open(ACCOUNTS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+def load_targets():
+    if os.path.exists(TARGETS_FILE):
+        with open(TARGETS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    # default target
+    default = {str(DEFAULT_TARGET): {'id': DEFAULT_TARGET, 'name': 'Default Group'}}
+    save_targets(default)
+    return default
+
+def save_targets(data):
+    with open(TARGETS_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
@@ -58,8 +72,14 @@ async def run_bot(phone, session_string):
         running_bots[phone]['client'] = client
         running_bots[phone]['status'] = 'running'
 
-        @client.on(events.NewMessage(chats=TARGET_CHAT_ID))
+        @client.on(events.NewMessage)
         async def react(event):
+            # Dynamic target check
+            targets = load_targets()
+            target_ids = {t['id'] for t in targets.values()}
+            if target_ids and event.chat_id not in target_ids:
+                return
+
             msg = event.message
             if not msg or not msg.id:
                 return
@@ -118,28 +138,27 @@ def _stop_bot(phone):
     loop   = bot.get('loop')
     if client and loop and loop.is_running():
         try:
-            asyncio.run_coroutine_threadsafe(
-                client.disconnect(), loop
-            ).result(timeout=5)
+            asyncio.run_coroutine_threadsafe(client.disconnect(), loop).result(timeout=5)
         except Exception:
             pass
     if phone in running_bots:
         running_bots[phone]['status'] = 'stopped'
 
 
-# ── Web Routes ─────────────────────────────────────────────
+# ── Routes ─────────────────────────────────────────────────
 @app.route('/')
 def index():
     accounts = load_accounts()
+    targets  = load_targets()
     for phone, data in accounts.items():
         bot = running_bots.get(phone)
-        data['status']       = bot['status'] if bot else 'stopped'
-        data['react_count']  = bot.get('react_count', 0) if bot else 0
+        data['status']      = bot['status'] if bot else 'stopped'
+        data['react_count'] = bot.get('react_count', 0) if bot else 0
     total   = len(accounts)
     running = sum(1 for p in accounts if running_bots.get(p, {}).get('status') == 'running')
     return render_template('index.html',
-                           accounts=accounts, total=total,
-                           running=running, target=TARGET_CHAT_ID,
+                           accounts=accounts, targets=targets,
+                           total=total, running=running,
                            reaction=REACTION)
 
 
@@ -186,6 +205,35 @@ def api_delete(phone):
     return jsonify({'status': 'deleted'})
 
 
+# ── Target Routes ──────────────────────────────────────────
+@app.route('/api/targets', methods=['GET'])
+def get_targets():
+    return jsonify(load_targets())
+
+@app.route('/api/targets', methods=['POST'])
+def add_target():
+    data = request.json
+    try:
+        chat_id = int(data.get('id', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid Chat ID'}), 400
+    if not chat_id:
+        return jsonify({'error': 'Chat ID required'}), 400
+    name = data.get('name', '').strip() or f'Group {chat_id}'
+    targets = load_targets()
+    key = str(chat_id)
+    targets[key] = {'id': chat_id, 'name': name}
+    save_targets(targets)
+    return jsonify({'status': 'added', 'key': key, 'id': chat_id, 'name': name})
+
+@app.route('/api/targets/<key>', methods=['DELETE'])
+def delete_target(key):
+    targets = load_targets()
+    targets.pop(key, None)
+    save_targets(targets)
+    return jsonify({'status': 'deleted'})
+
+
 # ── Login Flow ─────────────────────────────────────────────
 @app.route('/api/login/send-code', methods=['POST'])
 def send_code():
@@ -193,20 +241,16 @@ def send_code():
     if not phone:
         return jsonify({'error': 'Phone required'}), 400
 
-    # Cleanup old pending
     old = pending_logins.pop(phone, None)
     if old:
         try:
-            asyncio.run_coroutine_threadsafe(
-                old['client'].disconnect(), old['loop']
-            ).result(timeout=3)
+            asyncio.run_coroutine_threadsafe(old['client'].disconnect(), old['loop']).result(timeout=3)
             old['loop'].call_soon_threadsafe(old['loop'].stop)
         except Exception:
             pass
 
     loop = asyncio.new_event_loop()
     threading.Thread(target=loop.run_forever, daemon=True).start()
-
     client = TelegramClient(
         StringSession(), API_ID, API_HASH,
         device_model='Desktop', system_version='Windows 10',
@@ -272,21 +316,17 @@ def _finish_login(phone, client, loop):
     name = f"{me.first_name or ''} {me.last_name or ''}".strip()
     accounts = load_accounts()
     accounts[phone] = {
-        'phone':          phone,
-        'name':           name,
-        'username':       me.username or '',
-        'user_id':        me.id,
+        'phone': phone, 'name': name,
+        'username': me.username or '', 'user_id': me.id,
         'session_string': ss,
-        'added_at':       datetime.utcnow().isoformat()
+        'added_at': datetime.utcnow().isoformat()
     }
     save_accounts(accounts)
-
     pending_logins.pop(phone, None)
     try:
         loop.call_soon_threadsafe(loop.stop)
     except Exception:
         pass
-
     _start_bot_thread(phone, ss)
     return jsonify({'status': 'success', 'name': name,
                     'username': me.username or '', 'phone': phone})
@@ -311,6 +351,7 @@ def autostart():
                 'added_at': datetime.utcnow().isoformat()
             }
             save_accounts(accounts)
+    load_targets()  # init targets file
     for phone, data in accounts.items():
         ss = data.get('session_string')
         if ss:
