@@ -1,0 +1,11 @@
+# Telegram session files (contains your login credentials - NEVER upload!)
+*.session
+*.session-journal
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment
+.env
