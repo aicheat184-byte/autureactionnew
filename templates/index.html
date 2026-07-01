@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AutoReact Bot Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07071a;
+  --card:rgba(14,14,42,0.85);
+  --border:rgba(124,58,237,0.22);
+  --purple:#7c3aed;
+  --cyan:#06b6d4;
+  --green:#10b981;
+  --red:#ef4444;
+  --yellow:#f59e0b;
+  --text:#f1f5f9;
+  --muted:#64748b;
+  --input:rgba(255,255,255,0.06);
+}
+body{
+  font-family:'Inter',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  background-image:
+    radial-gradient(ellipse at 15% 15%,rgba(124,58,237,.18) 0,transparent 55%),
+    radial-gradient(ellipse at 85% 85%,rgba(6,182,212,.12) 0,transparent 55%),
+    radial-gradient(ellipse at 50% 50%,rgba(124,58,237,.05) 0,transparent 70%);
+}
+
+/* ── HEADER ─────────────────────────────────────────────── */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 32px;
+  border-bottom:1px solid var(--border);
+  background:rgba(7,7,26,.6);
+  backdrop-filter:blur(20px);
+  position:sticky;top:0;z-index:100;
+}
+.logo{
+  display:flex;align-items:center;gap:12px;
+  font-size:1.3rem;font-weight:800;
+  background:linear-gradient(135deg,var(--purple),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.logo-icon{font-size:1.6rem;-webkit-text-fill-color:initial}
+.header-stats{display:flex;gap:12px}
+.stat-pill{
+  padding:6px 14px;border-radius:999px;font-size:.8rem;font-weight:600;
+  border:1px solid var(--border);background:rgba(124,58,237,.1);
+}
+.stat-pill span{color:var(--purple);margin-right:4px}
+
+/* ── INFO BAR ────────────────────────────────────────────── */
+.info-bar{
+  display:flex;align-items:center;gap:24px;flex-wrap:wrap;
+  padding:14px 32px;
+  background:rgba(124,58,237,.06);
+  border-bottom:1px solid var(--border);
+  font-size:.85rem;color:var(--muted);
+}
+.info-bar strong{color:var(--text)}
+.reaction-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 10px;border-radius:999px;
+  background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);
+  font-size:.85rem;
+}
+
+/* ── MAIN ────────────────────────────────────────────────── */
+main{padding:32px;max-width:1200px;margin:0 auto}
+h2.section-title{
+  font-size:1rem;font-weight:600;color:var(--muted);
+  letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px;
+}
+
+/* ── GRID ────────────────────────────────────────────────── */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:20px;
+}
+
+/* ── CARD ────────────────────────────────────────────────── */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:24px;
+  backdrop-filter:blur(24px);
+  transition:all .3s ease;
+  animation:fadeIn .4s ease forwards;
+  opacity:0;
+}
+.card:hover{
+  border-color:rgba(124,58,237,.6);
+  box-shadow:0 8px 40px rgba(124,58,237,.18),0 0 0 1px rgba(124,58,237,.2);
+  transform:translateY(-4px);
+}
+@keyframes fadeIn{to{opacity:1}}
+
+.card-top{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px}
+.avatar{
+  width:52px;height:52px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:1.1rem;color:#fff;flex-shrink:0;
+}
+.card-info{flex:1;min-width:0}
+.card-name{font-weight:700;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-username{font-size:.82rem;color:var(--cyan);margin-top:2px}
+.card-phone{font-size:.78rem;color:var(--muted);margin-top:3px}
+
+/* ── STATUS BADGE ────────────────────────────────────────── */
+.status-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 10px;border-radius:999px;font-size:.76rem;font-weight:600;
+  flex-shrink:0;
+}
+.status-dot{
+  width:7px;height:7px;border-radius:50%;
+}
+.status-badge.running{
+  background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.4);color:#10b981;
+}
+.status-badge.running .status-dot{
+  background:#10b981;
+  box-shadow:0 0 0 0 rgba(16,185,129,.5);
+  animation:pulse-green 1.5s infinite;
+}
+.status-badge.starting{
+  background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:#f59e0b;
+}
+.status-badge.starting .status-dot{
+  background:#f59e0b;animation:pulse-yellow 1.5s infinite;
+}
+.status-badge.stopped{
+  background:rgba(100,116,139,.1);border:1px solid rgba(100,116,139,.25);color:#64748b;
+}
+.status-badge.stopped .status-dot{background:#64748b}
+.status-badge.error,.status-badge.auth_error{
+  background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#ef4444;
+}
+.status-badge.error .status-dot,.status-badge.auth_error .status-dot{background:#ef4444}
+
+@keyframes pulse-green{
+  0%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}
+  70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}
+  100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}
+}
+@keyframes pulse-yellow{
+  0%{box-shadow:0 0 0 0 rgba(245,158,11,.5)}
+  70%{box-shadow:0 0 0 8px rgba(245,158,11,0)}
+  100%{box-shadow:0 0 0 0 rgba(245,158,11,0)}
+}
+
+/* ── REACT COUNT ─────────────────────────────────────────── */
+.react-count{
+  display:flex;align-items:center;gap:6px;
+  font-size:.82rem;color:var(--muted);margin-bottom:16px;
+}
+.react-count strong{color:var(--purple)}
+
+/* ── CARD ACTIONS ────────────────────────────────────────── */
+.card-actions{display:flex;gap:8px}
+.btn{
+  padding:9px 16px;border-radius:10px;border:none;
+  font-family:'Inter',sans-serif;font-size:.84rem;font-weight:600;
+  cursor:pointer;transition:all .2s ease;display:flex;align-items:center;gap:6px;
+}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-start{
+  flex:1;
+  background:linear-gradient(135deg,#059669,#10b981);color:#fff;
+}
+.btn-start:hover:not(:disabled){filter:brightness(1.15);transform:scale(1.02)}
+.btn-stop{
+  flex:1;
+  background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;
+}
+.btn-stop:hover:not(:disabled){filter:brightness(1.1);transform:scale(1.02)}
+.btn-delete{
+  width:40px;height:40px;padding:0;
+  background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);
+  color:#ef4444;border-radius:10px;font-size:1rem;
+  display:flex;align-items:center;justify-content:center;
+}
+.btn-delete:hover{background:rgba(239,68,68,.18);border-color:rgba(239,68,68,.4)}
+
+/* ── EMPTY STATE ─────────────────────────────────────────── */
+.empty{
+  text-align:center;padding:80px 20px;
+  display:none;
+}
+.empty-icon{font-size:4rem;margin-bottom:16px;opacity:.4}
+.empty-title{font-size:1.2rem;font-weight:600;color:var(--muted)}
+.empty-sub{font-size:.9rem;color:var(--muted);margin-top:8px;opacity:.7}
+
+/* ── FAB ─────────────────────────────────────────────────── */
+.fab{
+  position:fixed;bottom:32px;right:32px;
+  width:60px;height:60px;border-radius:50%;border:none;
+  background:linear-gradient(135deg,var(--purple),var(--cyan));
+  color:#fff;font-size:1.8rem;cursor:pointer;
+  box-shadow:0 8px 32px rgba(124,58,237,.5);
+  transition:all .3s ease;z-index:200;
+  display:flex;align-items:center;justify-content:center;
+}
+.fab:hover{transform:scale(1.12) rotate(45deg);box-shadow:0 12px 40px rgba(124,58,237,.7)}
+
+/* ── MODAL ───────────────────────────────────────────────── */
+.overlay{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(0,0,0,.7);backdrop-filter:blur(8px);
+  display:none;place-items:center;
+}
+.overlay.active{display:grid}
+.modal{
+  background:rgba(14,14,42,.97);
+  border:1px solid rgba(124,58,237,.35);
+  border-radius:24px;padding:36px;
+  width:min(420px,calc(100vw - 40px));
+  box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 0 1px rgba(124,58,237,.2);
+  animation:slideUp .3s ease;
+}
+@keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-header{
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;
+}
+.modal-title{font-size:1.3rem;font-weight:800}
+.modal-close{
+  width:34px;height:34px;border-radius:50%;border:1px solid var(--border);
+  background:transparent;color:var(--muted);cursor:pointer;font-size:1.1rem;
+  display:flex;align-items:center;justify-content:center;transition:all .2s;
+}
+.modal-close:hover{background:rgba(239,68,68,.15);color:#ef4444;border-color:rgba(239,68,68,.3)}
+.step{display:none}
+.step.active{display:block}
+.step-label{
+  font-size:.78rem;font-weight:600;color:var(--purple);
+  text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;
+}
+.step-desc{font-size:.9rem;color:var(--muted);margin-bottom:20px;line-height:1.5}
+.input-wrap{margin-bottom:16px}
+.input-wrap label{display:block;font-size:.83rem;font-weight:500;margin-bottom:6px;color:var(--muted)}
+.input-wrap input{
+  width:100%;padding:12px 16px;
+  background:var(--input);border:1px solid var(--border);
+  border-radius:12px;color:var(--text);font-family:'Inter',sans-serif;font-size:.95rem;
+  outline:none;transition:border-color .2s;
+}
+.input-wrap input:focus{border-color:rgba(124,58,237,.6);background:rgba(124,58,237,.08)}
+.input-wrap input::placeholder{color:var(--muted)}
+.btn-primary{
+  width:100%;padding:13px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,var(--purple),var(--cyan));
+  color:#fff;font-family:'Inter',sans-serif;font-size:.95rem;font-weight:700;
+  cursor:pointer;transition:all .25s;
+}
+.btn-primary:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.step-progress{
+  display:flex;gap:6px;margin-bottom:24px;
+}
+.step-dot{
+  height:4px;flex:1;border-radius:2px;background:rgba(124,58,237,.15);transition:all .3s;
+}
+.step-dot.done{background:var(--purple)}
+
+/* ── SUCCESS ─────────────────────────────────────────────── */
+.success-icon{
+  font-size:3.5rem;text-align:center;display:block;margin-bottom:12px;
+  animation:pop .4s ease;
+}
+@keyframes pop{0%{transform:scale(.5)}70%{transform:scale(1.1)}100%{transform:scale(1)}}
+.success-name{text-align:center;font-size:1.15rem;font-weight:700;margin-bottom:4px}
+.success-sub{text-align:center;font-size:.87rem;color:var(--muted);margin-bottom:24px}
+
+/* ── TOAST ───────────────────────────────────────────────── */
+#toastContainer{position:fixed;bottom:100px;right:24px;z-index:999;display:flex;flex-direction:column;gap:10px}
+.toast{
+  padding:12px 18px;border-radius:12px;font-size:.85rem;font-weight:500;
+  min-width:220px;max-width:320px;
+  animation:toastIn .3s ease;
+  border:1px solid;
+}
+.toast.success{background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.4);color:#10b981}
+.toast.error{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4);color:#ef4444}
+.toast.info{background:rgba(124,58,237,.15);border-color:rgba(124,58,237,.4);color:#a78bfa}
+@keyframes toastIn{from{transform:translateX(60px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ── LOADING SPINNER ─────────────────────────────────────── */
+.spinner{
+  width:18px;height:18px;border:2px solid rgba(255,255,255,.3);
+  border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── RESPONSIVE ──────────────────────────────────────────── */
+@media(max-width:600px){
+  header{padding:16px 20px}
+  main{padding:20px}
+  .info-bar{padding:12px 20px}
+  .fab{bottom:20px;right:20px;width:52px;height:52px;font-size:1.5rem}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <span class="logo-icon">🤖</span>
+    AutoReact Dashboard
+  </div>
+  <div class="header-stats">
+    <div class="stat-pill" id="totalPill"><span id="totalCount">{{ total }}</span> Accounts</div>
+    <div class="stat-pill" id="runningPill"><span id="runningCount">{{ running }}</span> Running</div>
+  </div>
+</header>
+
+<!-- INFO BAR -->
+<div class="info-bar">
+  <span>🎯 Target: <strong>{{ target }}</strong></span>
+  <span>Reaction: <span class="reaction-badge">{{ reaction }} 🙏</span></span>
+</div>
+
+<!-- MAIN -->
+<main>
+  <h2 class="section-title">Telegram Accounts</h2>
+
+  <div class="grid" id="grid">
+    {% for phone, acc in accounts.items() %}
+    <div class="card" id="card-{{ phone|urlencode }}" data-phone="{{ phone }}"
+         style="animation-delay:{{ loop.index0 * 0.07 }}s">
+      <div class="card-top">
+        <div class="avatar" style="background:{{ ['#7c3aed','#06b6d4','#10b981','#f59e0b','#ec4899','#8b5cf6','#ef4444'][loop.index0 % 7] }}">
+          {{ (acc.name or phone)[:2]|upper }}
+        </div>
+        <div class="card-info">
+          <div class="card-name">{{ acc.name or 'Unknown' }}</div>
+          {% if acc.username %}<div class="card-username">@{{ acc.username }}</div>{% endif %}
+          <div class="card-phone">{{ phone }}</div>
+        </div>
+        <span class="status-badge {{ acc.status }}" id="badge-{{ phone|urlencode }}">
+          <span class="status-dot"></span>
+          <span class="status-text">{{ acc.status|capitalize }}</span>
+        </span>
+      </div>
+      <div class="react-count">
+        🙏 Reacted: <strong id="count-{{ phone|urlencode }}">{{ acc.react_count }}</strong> times
+      </div>
+      <div class="card-actions">
+        {% if acc.status == 'running' %}
+        <button class="btn btn-stop" onclick="stopBot('{{ phone }}')">⏹ Stop</button>
+        {% else %}
+        <button class="btn btn-start" onclick="startBot('{{ phone }}')">▶ Start</button>
+        {% endif %}
+        <button class="btn btn-delete" onclick="deleteAccount('{{ phone }}')" title="Delete">🗑</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="empty" id="empty" {% if accounts %}style="display:none"{% endif %}>
+    <div class="empty-icon">🤖</div>
+    <div class="empty-title">No accounts yet</div>
+    <div class="empty-sub">Click + to add your Telegram account</div>
+  </div>
+</main>
+
+<!-- FAB -->
+<button class="fab" onclick="openModal()" title="Add Account">+</button>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">Add Account</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="step-progress">
+      <div class="step-dot" id="dot1"></div>
+      <div class="step-dot" id="dot2"></div>
+      <div class="step-dot" id="dot3"></div>
+    </div>
+
+    <!-- Step 1: Phone -->
+    <div class="step active" id="step1">
+      <div class="step-label">Step 1 — Phone Number</div>
+      <div class="step-desc">Enter your Telegram phone number with country code.</div>
+      <div class="input-wrap">
+        <label>Phone Number</label>
+        <input type="tel" id="inputPhone" placeholder="+85512345678" />
+      </div>
+      <button class="btn-primary" id="btnSendCode" onclick="sendCode()">Send OTP Code</button>
+    </div>
+
+    <!-- Step 2: OTP -->
+    <div class="step" id="step2">
+      <div class="step-label">Step 2 — OTP Code</div>
+      <div class="step-desc" id="otpDesc">Enter the code sent to your Telegram.</div>
+      <div class="input-wrap">
+        <label>OTP Code</label>
+        <input type="text" id="inputOTP" placeholder="12345" maxlength="10" />
+      </div>
+      <button class="btn-primary" id="btnVerifyOTP" onclick="verifyOTP()">Verify Code</button>
+    </div>
+
+    <!-- Step 3: 2FA -->
+    <div class="step" id="step3">
+      <div class="step-label">Step 3 — Two-Factor Auth</div>
+      <div class="step-desc">Your account has 2FA enabled. Enter your password.</div>
+      <div class="input-wrap">
+        <label>2FA Password</label>
+        <input type="password" id="input2FA" placeholder="••••••••" />
+      </div>
+      <button class="btn-primary" id="btnVerify2FA" onclick="verify2FA()">Login</button>
+    </div>
+
+    <!-- Step 4: Success -->
+    <div class="step" id="step4">
+      <span class="success-icon">🎉</span>
+      <div class="success-name" id="successName"></div>
+      <div class="success-sub" id="successSub"></div>
+      <button class="btn-primary" onclick="closeModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toastContainer"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────
+let currentPhone = '';
+const AVATAR_COLORS = ['#7c3aed','#06b6d4','#10b981','#f59e0b','#ec4899','#8b5cf6','#ef4444'];
+let avatarIndex = {{ accounts|length }};
+
+// ── Toast ──────────────────────────────────────────────────
+function toast(msg, type='info', ms=3500) {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+
+// ── Modal ──────────────────────────────────────────────────
+function openModal() {
+  document.getElementById('overlay').classList.add('active');
+  goStep(1);
+  document.getElementById('inputPhone').value = '';
+  document.getElementById('inputOTP').value = '';
+  document.getElementById('input2FA').value = '';
+}
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('overlay') && e) return;
+  document.getElementById('overlay').classList.remove('active');
+}
+function goStep(n) {
+  [1,2,3,4].forEach(i => {
+    document.getElementById('step'+i).classList.toggle('active', i===n);
+    const dot = document.getElementById('dot'+i);
+    if (dot) dot.classList.toggle('done', i<=n);
+  });
+  const titles = {1:'Add Account',2:'Verify OTP',3:'Two-Factor Auth',4:'All Done!'};
+  document.getElementById('modalTitle').textContent = titles[n]||'';
+}
+
+// ── Loading state helper ──────────────────────────────────
+function setLoading(btnId, loading, text) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = loading;
+  btn.innerHTML = loading ? '<span class="spinner"></span>' : text;
+}
+
+// ── Send Code ──────────────────────────────────────────────
+async function sendCode() {
+  const phone = document.getElementById('inputPhone').value.trim();
+  if (!phone) { toast('Enter phone number', 'error'); return; }
+  currentPhone = phone;
+  setLoading('btnSendCode', true, 'Send OTP Code');
+  try {
+    const r = await fetch('/api/login/send-code', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({phone})
+    });
+    const d = await r.json();
+    if (d.error) { toast(d.error, 'error'); return; }
+    document.getElementById('otpDesc').textContent = `Code sent to ${phone}`;
+    goStep(2);
+    toast('Code sent! Check Telegram', 'success');
+  } catch(e) {
+    toast('Network error', 'error');
+  } finally {
+    setLoading('btnSendCode', false, 'Send OTP Code');
+  }
+}
+
+// ── Verify OTP ─────────────────────────────────────────────
+async function verifyOTP() {
+  const code = document.getElementById('inputOTP').value.trim();
+  if (!code) { toast('Enter OTP code', 'error'); return; }
+  setLoading('btnVerifyOTP', true, 'Verify Code');
+  try {
+    const r = await fetch('/api/login/verify-otp', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({phone: currentPhone, code})
+    });
+    const d = await r.json();
+    if (d.error) { toast(d.error, 'error'); return; }
+    if (d.status === 'need_2fa') { goStep(3); toast('Enter 2FA password', 'info'); return; }
+    if (d.status === 'success') showSuccess(d);
+  } catch(e) {
+    toast('Network error', 'error');
+  } finally {
+    setLoading('btnVerifyOTP', false, 'Verify Code');
+  }
+}
+
+// ── Verify 2FA ─────────────────────────────────────────────
+async function verify2FA() {
+  const pw = document.getElementById('input2FA').value.trim();
+  if (!pw) { toast('Enter 2FA password', 'error'); return; }
+  setLoading('btnVerify2FA', true, 'Login');
+  try {
+    const r = await fetch('/api/login/verify-2fa', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({phone: currentPhone, password: pw})
+    });
+    const d = await r.json();
+    if (d.error) { toast(d.error, 'error'); return; }
+    if (d.status === 'success') showSuccess(d);
+  } catch(e) {
+    toast('Network error', 'error');
+  } finally {
+    setLoading('btnVerify2FA', false, 'Login');
+  }
+}
+
+// ── Show Success ───────────────────────────────────────────
+function showSuccess(data) {
+  document.getElementById('successName').textContent = data.name || data.phone;
+  document.getElementById('successSub').textContent =
+    (data.username ? '@' + data.username + ' • ' : '') + 'Bot started! 🙏';
+  goStep(4);
+  toast('Account added & bot started!', 'success', 4000);
+  addCard(data);
+  updateStats();
+}
+
+// ── Add card to DOM ────────────────────────────────────────
+function addCard(data) {
+  const phone = data.phone;
+  const color = AVATAR_COLORS[avatarIndex++ % AVATAR_COLORS.length];
+  const initials = (data.name || phone).substring(0,2).toUpperCase();
+  const id = encodeURIComponent(phone);
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = 'card-' + id;
+  card.dataset.phone = phone;
+  card.innerHTML = `
+    <div class="card-top">
+      <div class="avatar" style="background:${color}">${initials}</div>
+      <div class="card-info">
+        <div class="card-name">${data.name || 'Unknown'}</div>
+        ${data.username ? `<div class="card-username">@${data.username}</div>` : ''}
+        <div class="card-phone">${phone}</div>
+      </div>
+      <span class="status-badge starting" id="badge-${id}">
+        <span class="status-dot"></span>
+        <span class="status-text">Starting</span>
+      </span>
+    </div>
+    <div class="react-count">🙏 Reacted: <strong id="count-${id}">0</strong> times</div>
+    <div class="card-actions" id="actions-${id}">
+      <button class="btn btn-stop" onclick="stopBot('${phone}')">⏹ Stop</button>
+      <button class="btn btn-delete" onclick="deleteAccount('${phone}')" title="Delete">🗑</button>
+    </div>`;
+  document.getElementById('grid').appendChild(card);
+  document.getElementById('empty').style.display = 'none';
+}
+
+// ── Start Bot ──────────────────────────────────────────────
+async function startBot(phone) {
+  const id = encodeURIComponent(phone);
+  const btn = document.querySelector(`#card-${id} .btn-start`);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'; }
+  try {
+    await fetch(`/api/start/${encodeURIComponent(phone)}`, {method:'POST'});
+    toast(`Starting bot for ${phone}`, 'info');
+  } catch(e) {
+    toast('Error starting bot', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '▶ Start'; }
+  }
+}
+
+// ── Stop Bot ───────────────────────────────────────────────
+async function stopBot(phone) {
+  const id = encodeURIComponent(phone);
+  const btn = document.querySelector(`#card-${id} .btn-stop`);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'; }
+  try {
+    await fetch(`/api/stop/${encodeURIComponent(phone)}`, {method:'POST'});
+    toast(`Bot stopped for ${phone}`, 'info');
+  } catch(e) {
+    toast('Error stopping bot', 'error');
+  }
+}
+
+// ── Delete Account ─────────────────────────────────────────
+async function deleteAccount(phone) {
+  if (!confirm(`Delete ${phone}?`)) return;
+  await fetch(`/api/delete/${encodeURIComponent(phone)}`, {method:'DELETE'});
+  const id = encodeURIComponent(phone);
+  document.getElementById('card-' + id)?.remove();
+  toast('Account deleted', 'info');
+  updateStats();
+  if (!document.querySelector('.card')) {
+    document.getElementById('empty').style.display = '';
+  }
+}
+
+// ── Update Stats ───────────────────────────────────────────
+function updateStats() {
+  const cards = document.querySelectorAll('.card');
+  let running = 0;
+  cards.forEach(c => {
+    const badge = c.querySelector('.status-badge');
+    if (badge && badge.classList.contains('running')) running++;
+  });
+  document.getElementById('totalCount').textContent = cards.length;
+  document.getElementById('runningCount').textContent = running;
+}
+
+// ── Status Polling ─────────────────────────────────────────
+async function pollStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const data = await r.json();
+    let running = 0, total = Object.keys(data).length;
+
+    for (const [phone, info] of Object.entries(data)) {
+      const id = encodeURIComponent(phone);
+      const badge = document.getElementById('badge-' + id);
+      const countEl = document.getElementById('count-' + id);
+      const actionsEl = document.getElementById('actions-' + id);
+
+      if (badge) {
+        const statuses = ['running','starting','stopped','error','auth_error'];
+        statuses.forEach(s => badge.classList.remove(s));
+        badge.classList.add(info.status);
+        badge.querySelector('.status-text').textContent =
+          info.status.charAt(0).toUpperCase() + info.status.slice(1);
+      }
+
+      if (countEl) countEl.textContent = info.react_count || 0;
+
+      if (actionsEl) {
+        const isRunning = info.status === 'running' || info.status === 'starting';
+        actionsEl.innerHTML = `
+          ${isRunning
+            ? `<button class="btn btn-stop" onclick="stopBot('${phone}')">⏹ Stop</button>`
+            : `<button class="btn btn-start" onclick="startBot('${phone}')">▶ Start</button>`}
+          <button class="btn btn-delete" onclick="deleteAccount('${phone}')" title="Delete">🗑</button>`;
+      }
+
+      if (info.status === 'running') running++;
+    }
+
+    document.getElementById('totalCount').textContent = total;
+    document.getElementById('runningCount').textContent = running;
+  } catch(e) {}
+}
+
+// Enter key support
+document.getElementById('inputPhone').addEventListener('keydown', e => { if (e.key==='Enter') sendCode(); });
+document.getElementById('inputOTP').addEventListener('keydown', e => { if (e.key==='Enter') verifyOTP(); });
+document.getElementById('input2FA').addEventListener('keydown', e => { if (e.key==='Enter') verify2FA(); });
+
+// Start polling
+setInterval(pollStatus, 3000);
+</script>
+</body>
+</html>
