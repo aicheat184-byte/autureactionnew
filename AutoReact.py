@@ -108,7 +108,12 @@ async def main():
 
     # Start Telegram bot
     print("[*] Connecting to Telegram...")
-    await client.start(phone=PHONE if not SESSION_STRING else None)
+    if SESSION_STRING:
+        # StringSession — just connect, already authenticated
+        await client.connect()
+    else:
+        # Local file session — use start() for login prompt
+        await client.start(phone=PHONE)
 
     me = await client.get_me()
     print("=" * 50)
