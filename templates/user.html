@@ -601,14 +601,16 @@ async function removeTarget(key){
   toast('Target removed','inf');
 }
 
-// ── Emoji ────────────────────────────────────────────────
+// ── Emoji (per-account) ──────────────────────────────────
 async function setEmoji(e){
+  if(!MY_PHONE){toast('No account linked','err');return}
   try{
-    const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reaction:e})});
+    const r=await fetch(`/api/accounts/${encodeURIComponent(MY_PHONE)}/emoji`,{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reaction:e})});
     const d=await r.json();if(d.error){toast(d.error,'err');return}
     document.getElementById('curEmo').textContent=e;
     document.querySelectorAll('.emo').forEach(b=>b.classList.toggle('sel',b.textContent===e));
-    toast(`Reaction → ${e}`,'ok');
+    toast(`Your reaction → ${e}`,'ok');
   }catch{toast('Error','err')}
 }
 

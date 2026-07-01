@@ -178,7 +178,9 @@ async def run_bot(phone, session_string):
 
             await asyncio.sleep(DELAY)
             try:
-                cur_reaction = load_config().get('reaction', DEFAULT_REACT)
+                # Per-account emoji, fallback to global
+                acc_data = load_accounts().get(phone, {})
+                cur_reaction = acc_data.get('reaction') or load_config().get('reaction', DEFAULT_REACT)
                 await client(SendReactionRequest(
                     peer=await event.get_input_chat(),
                     msg_id=msg.id,
@@ -334,13 +336,15 @@ def index():
     my_phone   = session.get('phone')
     my_account = accounts.get(my_phone) if my_phone else None
     template   = 'admin.html' if session.get('role') == 'admin' else 'user.html'
+    # Per-account emoji for user, global for admin
+    my_reaction = (my_account.get('reaction') if my_account else None) or config.get('reaction', DEFAULT_REACT)
     return render_template(template,
                            accounts=accounts,
                            my_account=my_account,
                            my_phone=my_phone,
                            config=config,
                            total=total, running=running,
-                           reaction=config.get('reaction', DEFAULT_REACT),
+                           reaction=my_reaction if template == 'user.html' else config.get('reaction', DEFAULT_REACT),
                            contact=CONTACT,
                            current_user=session.get('username'),
                            current_role=session.get('role'),
@@ -472,6 +476,24 @@ def set_config():
         config['reaction'] = data['reaction']
     save_config(config)
     return jsonify({'status': 'saved', **config})
+
+
+# ── Per-Account Emoji ──────────────────────────────────────
+@app.route('/api/accounts/<path:phone>/emoji', methods=['POST'])
+@login_required
+def set_account_emoji(phone):
+    if phone not in get_visible_accounts():
+        return jsonify({'error': 'No permission'}), 403
+    data = request.json or {}
+    emoji = data.get('reaction', '').strip()
+    if not emoji:
+        return jsonify({'error': 'Emoji required'}), 400
+    accounts = load_accounts()
+    if phone not in accounts:
+        return jsonify({'error': 'Account not found'}), 404
+    accounts[phone]['reaction'] = emoji
+    save_accounts(accounts)
+    return jsonify({'status': 'saved', 'reaction': emoji})
 
 
 # ── User Management (Admin Only) ───────────────────────────
