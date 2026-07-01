@@ -2,19 +2,21 @@ import asyncio
 import sys
 import os
 
-# Fix Windows console Unicode
 if sys.platform == 'win32':
-    os.system('chcp 65001 > nul')
-    sys.stdout.reconfigure(encoding='utf-8')
-    sys.stderr.reconfigure(encoding='utf-8')
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 from telethon.tl.functions.messages import SendReactionRequest
 from telethon.tl.types import ReactionEmoji
 from telethon.errors import FloodWaitError
 
 # ====================================================
-#  AUTO REACT BOT — React 🙏 every message in group
+#  AUTO REACT BOT — Deploy on Render / Local
 # ====================================================
 
 API_ID   = 2040
@@ -22,14 +24,24 @@ API_HASH = 'b18441a1ff607e10a989891a5462e627'
 
 PHONE          = '+85593687814'
 TARGET_CHAT_ID = -1002199457550
-
-REACTION = '\U0001f64f'  # 🙏
-DELAY    = 0.5
+REACTION       = '\U0001f64f'  # 🙏
+DELAY          = 0.5
 
 # ====================================================
+# Use StringSession from env var (for Render deploy)
+# Falls back to file session (for local use)
+# ====================================================
+SESSION_STRING = os.environ.get('SESSION_STRING', '')
+
+if SESSION_STRING:
+    print("[*] Using StringSession from environment variable")
+    session = StringSession(SESSION_STRING)
+else:
+    print("[*] Using local session file: session_autoreact")
+    session = 'session_autoreact'
 
 client = TelegramClient(
-    'session_autoreact', API_ID, API_HASH,
+    session, API_ID, API_HASH,
     device_model     = 'Desktop',
     system_version   = 'Windows 10',
     app_version      = '5.3.1',
@@ -68,7 +80,7 @@ async def auto_react(event):
 
 async def main():
     print("[*] Connecting...")
-    await client.start(phone=PHONE)
+    await client.start(phone=PHONE if not SESSION_STRING else None)
 
     me = await client.get_me()
     print("=" * 50)
