@@ -1,6 +1,7 @@
 import asyncio
 import sys
 import os
+import threading
 
 if sys.platform == 'win32':
     try:
@@ -9,6 +10,7 @@ if sys.platform == 'win32':
     except Exception:
         pass
 
+from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import SendReactionRequest
@@ -16,7 +18,7 @@ from telethon.tl.types import ReactionEmoji
 from telethon.errors import FloodWaitError
 
 # ====================================================
-#  AUTO REACT BOT — Deploy on Render / Local
+#  AUTO REACT BOT — Web Service for Render
 # ====================================================
 
 API_ID   = 2040
@@ -26,10 +28,11 @@ PHONE          = '+85593687814'
 TARGET_CHAT_ID = -1002199457550
 REACTION       = '\U0001f64f'  # 🙏
 DELAY          = 0.5
+PORT           = int(os.environ.get('PORT', 10000))
 
 # ====================================================
-# Use StringSession from env var (for Render deploy)
-# Falls back to file session (for local use)
+# Session: StringSession from env var (Render)
+# Falls back to file session (local)
 # ====================================================
 SESSION_STRING = os.environ.get('SESSION_STRING', '')
 
@@ -40,6 +43,25 @@ else:
     print("[*] Using local session file: session_autoreact")
     session = 'session_autoreact'
 
+# ====================================================
+# Flask Web Server (keeps Render Web Service alive)
+# ====================================================
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return f'<h2>Auto React Bot is Running! 🙏</h2><p>Target: {TARGET_CHAT_ID}</p>'
+
+@app.route('/health')
+def health():
+    return 'OK', 200
+
+def run_flask():
+    app.run(host='0.0.0.0', port=PORT)
+
+# ====================================================
+# Telethon Bot
+# ====================================================
 client = TelegramClient(
     session, API_ID, API_HASH,
     device_model     = 'Desktop',
@@ -79,7 +101,13 @@ async def auto_react(event):
             print(f"[Error] Msg#{msg.id}: {err}")
 
 async def main():
-    print("[*] Connecting...")
+    # Start Flask in background thread
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    print(f"[*] Flask server started on port {PORT}")
+
+    # Start Telegram bot
+    print("[*] Connecting to Telegram...")
     await client.start(phone=PHONE if not SESSION_STRING else None)
 
     me = await client.get_me()
@@ -88,7 +116,7 @@ async def main():
     print(f"[OK] Target Chat: {TARGET_CHAT_ID}")
     print(f"[OK] Reaction   : {REACTION}")
     print("=" * 50)
-    print("[RUN] Auto React Bot running... Ctrl+C to stop.")
+    print("[RUN] Auto React Bot running...")
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
