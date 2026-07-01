@@ -334,7 +334,7 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
   {% for phone, acc in accounts.items() %}
   {% set colors=['#7c3aed','#0891b2','#059669','#b45309','#be185d','#4338ca','#b91c1c'] %}
   {% set color=colors[loop.index0 % 7] %}
-  <div class="card" data-phone="{{ phone }}" style="animation-delay:{{ loop.index0*.07 }}s">
+  <div class="card" data-phone="{{ phone }}" style="animation-delay:{{ loop.index0 * 0.07 }}s">
     <div class="card-top">
       <div class="av" style="background:{{ color }}">{{ (acc.name or phone)[:2]|upper }}</div>
       <div class="cm">
