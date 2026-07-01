@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Login · AutoReact by CHEATZ</title>
+<meta name="theme-color" content="#6d28d9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AutoReact">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -164,7 +169,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
   </button>
 
   <div class="footer">
-    Need help? <a href="https://t.me/User_88881" target="_blank">Contact @User_88881</a>
+    Don't have an account? <a href="/register">Register</a>
+    &nbsp;·&nbsp;
+    <a href="https://t.me/User_88881" target="_blank">Contact @User_88881</a>
   </div>
 </div>
 
@@ -194,7 +201,6 @@ async function doLogin(){
     });
     const d=await r.json();
     if(d.error){showErr(d.error);return}
-    // Success — redirect
     window.location.href='/';
   }catch{
     showErr('Network error. Try again.');
@@ -202,8 +208,8 @@ async function doLogin(){
     btn.disabled=false;btn.innerHTML='Sign In';
   }
 }
-// Enter key
 document.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/static/sw.js').catch(()=>{})}
 </script>
 </body>
 </html>

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Register · AutoReact by CHEATZ</title>
+<meta name="theme-color" content="#6d28d9">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#030711;--purple:#8b5cf6;--purple2:#6d28d9;
+  --cyan:#22d3ee;--gold:#f59e0b;--green:#10b981;--red:#f43f5e;
+  --text:#f8fafc;--muted:#94a3b8;--border:rgba(99,102,241,.2);
+  --input:rgba(255,255,255,.05);
+}
+html,body{min-height:100%}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
+  display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+
+/* BG */
+.orbs{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.orb{position:absolute;border-radius:50%;filter:blur(90px);animation:drift 22s ease-in-out infinite alternate}
+.o1{width:600px;height:600px;background:rgba(109,40,217,.12);top:-200px;right:-100px}
+.o2{width:500px;height:500px;background:rgba(6,182,212,.09);bottom:-200px;left:-100px;animation-delay:-11s}
+.o3{width:300px;height:300px;background:rgba(16,185,129,.06);top:30%;left:60%;animation-delay:-5s}
+@keyframes drift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,30px) scale(1.1)}}
+
+/* CARD */
+.card{
+  position:relative;z-index:1;
+  width:min(480px,100%);
+  background:rgba(8,12,32,.96);
+  border:1px solid rgba(139,92,246,.28);
+  border-radius:24px;padding:36px;
+  box-shadow:0 32px 80px rgba(0,0,0,.6),
+             0 0 0 1px rgba(139,92,246,.1),
+             inset 0 1px 0 rgba(255,255,255,.04);
+  animation:up .45s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes up{from{transform:translateY(36px) scale(.95);opacity:0}to{transform:none;opacity:1}}
+
+/* LOGO */
+.logo{text-align:center;margin-bottom:28px}
+.logo-icon{width:56px;height:56px;border-radius:16px;
+  background:linear-gradient(135deg,var(--purple2),var(--purple));
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:1.6rem;margin-bottom:12px;
+  box-shadow:0 0 28px rgba(139,92,246,.5)}
+.logo-name{font-family:'Outfit',sans-serif;font-size:1.5rem;font-weight:900;
+  background:linear-gradient(135deg,#c4b5fd,var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{font-size:.78rem;color:var(--muted);margin-top:3px}
+
+/* FORM */
+.form-title{font-family:'Outfit',sans-serif;font-size:1.1rem;font-weight:700;margin-bottom:5px}
+.form-sub{font-size:.82rem;color:var(--muted);margin-bottom:22px;line-height:1.5}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:.78rem;font-weight:500;color:var(--muted);margin-bottom:5px}
+.field .iw{position:relative}
+.field input{
+  width:100%;padding:11px 15px;
+  background:var(--input);border:1px solid var(--border);border-radius:10px;
+  color:var(--text);font-family:'Inter',sans-serif;font-size:.9rem;outline:none;
+  transition:border-color .2s,background .2s;
+}
+.field input:focus{border-color:rgba(139,92,246,.55);background:rgba(139,92,246,.07)}
+.field input::placeholder{color:rgba(148,163,184,.4)}
+.field input.err{border-color:rgba(244,63,94,.5)}
+.field .hint{font-size:.72rem;color:var(--red);margin-top:4px;display:none}
+.field .hint.show{display:block}
+.toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem}
+.toggle:hover{color:var(--text)}
+
+/* Password strength */
+.pw-strength{margin-top:6px;height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden}
+.pw-bar{height:100%;border-radius:2px;width:0;transition:width .3s,background .3s}
+
+.divider-line{display:flex;align-items:center;gap:10px;margin:6px 0 18px}
+.divider-line::before,.divider-line::after{content:'';flex:1;height:1px;background:var(--border)}
+.divider-line span{font-size:.72rem;color:var(--muted)}
+
+.btn-reg{
+  width:100%;padding:12px;border-radius:11px;border:none;
+  background:linear-gradient(135deg,var(--purple2),var(--purple));
+  color:#fff;font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:700;
+  cursor:pointer;transition:all .25s;
+  box-shadow:0 5px 20px rgba(109,40,217,.35);
+  display:flex;align-items:center;justify-content:center;gap:7px;
+}
+.btn-reg:hover:not(:disabled){box-shadow:0 7px 28px rgba(109,40,217,.55);transform:translateY(-1px)}
+.btn-reg:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+/* Error / Success */
+.alert{padding:10px 14px;border-radius:10px;margin-bottom:16px;
+  font-size:.83rem;display:none;animation:shake .3s ease}
+.alert.show{display:block}
+.alert.err{background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.3);color:#f43f5e}
+.alert.ok{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#10b981}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+
+/* Code field */
+.code-wrap{display:none}
+.code-wrap.show{display:block}
+
+.footer{text-align:center;margin-top:20px;font-size:.78rem;color:rgba(148,163,184,.6)}
+.footer a{color:var(--purple);text-decoration:none;font-weight:500}
+.footer a:hover{text-decoration:underline}
+
+/* SPINNER */
+.spin{display:inline-block;width:15px;height:15px;
+  border:2px solid rgba(255,255,255,.3);border-top-color:#fff;
+  border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="orbs"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">🤖</div>
+    <div class="logo-name">AutoReact</div>
+    <div class="logo-sub">Create your account</div>
+  </div>
+
+  <div class="alert err" id="errAlert"></div>
+  <div class="alert ok" id="okAlert"></div>
+
+  <div class="form-title">Create Account</div>
+  <div class="form-sub">Register to manage your Telegram bot.</div>
+
+  <div class="grid2">
+    <div class="field">
+      <label>Username *</label>
+      <input type="text" id="rUser" placeholder="user123" autocomplete="username" oninput="clearErr('rUser')"/>
+      <div class="hint" id="hUser"></div>
+    </div>
+    <div class="field">
+      <label>Display Name</label>
+      <input type="text" id="rName" placeholder="My Name"/>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Password *</label>
+    <div class="iw">
+      <input type="password" id="rPass" placeholder="At least 6 characters" oninput="checkPwStrength()"/>
+      <button class="toggle" type="button" onclick="toggleVis('rPass',this)">👁</button>
+    </div>
+    <div class="pw-strength"><div class="pw-bar" id="pwBar"></div></div>
+    <div class="hint" id="hPass"></div>
+  </div>
+
+  <div class="field">
+    <label>Confirm Password *</label>
+    <div class="iw">
+      <input type="password" id="rConf" placeholder="Repeat password" oninput="clearErr('rConf')"/>
+      <button class="toggle" type="button" onclick="toggleVis('rConf',this)">👁</button>
+    </div>
+    <div class="hint" id="hConf"></div>
+  </div>
+
+  <!-- Registration Code (shown only if server requires it) -->
+  <div class="code-wrap" id="codeWrap">
+    <div class="field">
+      <label>🔑 Registration Code</label>
+      <input type="text" id="rCode" placeholder="Enter invite code"/>
+    </div>
+  </div>
+
+  <button class="btn-reg" id="btnReg" onclick="doRegister()">
+    Create Account
+  </button>
+
+  <div class="footer">
+    Already have an account? <a href="/login">Sign In</a>
+  </div>
+</div>
+
+<script>
+// Check if registration code is required
+const requireCode = {{ 'true' if require_code else 'false' }};
+if (requireCode) document.getElementById('codeWrap').classList.add('show');
+
+function toggleVis(id, btn) {
+  const inp = document.getElementById(id);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+function clearErr(id) {
+  const inp = document.getElementById(id);
+  inp.classList.remove('err');
+}
+
+function showFieldErr(id, hintId, msg) {
+  document.getElementById(id).classList.add('err');
+  const h = document.getElementById(hintId);
+  if(h){ h.textContent = msg; h.classList.add('show'); }
+}
+
+function showAlert(type, msg) {
+  const e = document.getElementById('errAlert');
+  const o = document.getElementById('okAlert');
+  e.classList.remove('show'); o.classList.remove('show');
+  if(type==='err'){ e.textContent=msg; e.classList.add('show'); }
+  else { o.textContent=msg; o.classList.add('show'); }
+}
+
+function checkPwStrength() {
+  const pw = document.getElementById('rPass').value;
+  const bar = document.getElementById('pwBar');
+  let score = 0;
+  if (pw.length >= 6) score++;
+  if (pw.length >= 10) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^a-zA-Z0-9]/.test(pw)) score++;
+  const pct = (score / 5) * 100;
+  const colors = ['#f43f5e','#f59e0b','#f59e0b','#10b981','#10b981'];
+  bar.style.width = pct + '%';
+  bar.style.background = colors[Math.max(0,score-1)] || '#f43f5e';
+}
+
+async function doRegister() {
+  // Clear previous hints
+  ['hUser','hPass','hConf'].forEach(h => {
+    const el = document.getElementById(h);
+    if(el){ el.classList.remove('show'); el.textContent=''; }
+  });
+  ['rUser','rPass','rConf'].forEach(id => document.getElementById(id)?.classList.remove('err'));
+
+  const username = document.getElementById('rUser').value.trim();
+  const display_name = document.getElementById('rName').value.trim();
+  const password = document.getElementById('rPass').value;
+  const confirm = document.getElementById('rConf').value;
+  const code = document.getElementById('rCode')?.value.trim() || '';
+
+  // Validate
+  let hasErr = false;
+  if (!username || username.length < 3) {
+    showFieldErr('rUser','hUser','Min 3 characters'); hasErr=true;
+  }
+  if (!password || password.length < 6) {
+    showFieldErr('rPass','hPass','Min 6 characters'); hasErr=true;
+  }
+  if (password !== confirm) {
+    showFieldErr('rConf','hConf','Passwords do not match'); hasErr=true;
+  }
+  if (hasErr) return;
+
+  const btn = document.getElementById('btnReg');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Creating…';
+
+  try {
+    const r = await fetch('/api/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username, display_name: display_name||username, password, confirm, code})
+    });
+    const d = await r.json();
+    if (d.error) { showAlert('err', d.error); return; }
+    showAlert('ok', `✅ Account created! Redirecting to login…`);
+    setTimeout(() => window.location.href = '/login', 1800);
+  } catch {
+    showAlert('err', 'Network error. Please try again.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Create Account';
+  }
+}
+
+// Enter key support
+document.addEventListener('keydown', e => { if(e.key==='Enter') doRegister(); });
+
+// PWA sw register
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

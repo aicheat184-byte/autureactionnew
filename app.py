@@ -30,6 +30,7 @@ CONFIG_FILE   = 'config.json'
 USERS_FILE    = 'users.json'
 PORT          = int(os.environ.get('PORT', 5000))
 CONTACT       = 'https://t.me/User_88881'
+REGISTER_CODE = os.environ.get('REGISTER_CODE', '')  # empty = open registration
 
 # ── Global State ───────────────────────────────────────────
 running_bots   = {}
@@ -268,6 +269,50 @@ def logout():
     return redirect('/login')
 
 
+# ── Register Routes ──────────────────────────────────────
+@app.route('/register', methods=['GET'])
+def register_page():
+    if 'username' in session:
+        return redirect('/')
+    return render_template('register.html', require_code=bool(REGISTER_CODE))
+
+@app.route('/api/register', methods=['POST'])
+def do_register():
+    data         = request.json or {}
+    username     = data.get('username', '').strip()
+    password     = data.get('password', '').strip()
+    confirm      = data.get('confirm', '').strip()
+    display_name = data.get('display_name', '').strip() or username
+    code         = data.get('code', '').strip()
+
+    if not username or not password:
+        return jsonify({'error': 'Username and password required'}), 400
+    if len(username) < 3:
+        return jsonify({'error': 'Username must be at least 3 characters'}), 400
+    if not username.replace('_','').replace('-','').isalnum():
+        return jsonify({'error': 'Username: letters, numbers, _ and - only'}), 400
+    if len(password) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+    if password != confirm:
+        return jsonify({'error': 'Passwords do not match'}), 400
+    if REGISTER_CODE and code != REGISTER_CODE:
+        return jsonify({'error': 'Invalid registration code'}), 400
+
+    users = load_users()
+    if username in users:
+        return jsonify({'error': 'Username already taken'}), 409
+
+    users[username] = {
+        'password':     generate_password_hash(password),
+        'role':         'user',
+        'phone':        None,
+        'display_name': display_name
+    }
+    save_users(users)
+    print(f"[Register] New user: {username}")
+    return jsonify({'status': 'created', 'username': username})
+
+
 # ══════════════════════════════════════════════════════════
 # MAIN ROUTES
 # ══════════════════════════════════════════════════════════
@@ -277,6 +322,7 @@ def index():
     accounts    = get_visible_accounts()
     all_targets = load_targets()
     config      = load_config()
+    users       = load_users()
     for phone, data in accounts.items():
         bot = running_bots.get(phone)
         data['status']      = bot['status'] if bot else 'stopped'
@@ -284,14 +330,22 @@ def index():
         data['targets']     = all_targets.get(phone, {})
     total   = len(accounts)
     running = sum(1 for p in accounts if running_bots.get(p, {}).get('status') == 'running')
-    return render_template('index.html',
-                           accounts=accounts, config=config,
+    # Per-role template
+    my_phone   = session.get('phone')
+    my_account = accounts.get(my_phone) if my_phone else None
+    template   = 'admin.html' if session.get('role') == 'admin' else 'user.html'
+    return render_template(template,
+                           accounts=accounts,
+                           my_account=my_account,
+                           my_phone=my_phone,
+                           config=config,
                            total=total, running=running,
                            reaction=config.get('reaction', DEFAULT_REACT),
                            contact=CONTACT,
                            current_user=session.get('username'),
                            current_role=session.get('role'),
-                           display_name=session.get('display_name', session.get('username')))
+                           display_name=session.get('display_name', session.get('username')),
+                           web_users_count=len(users))
 
 
 @app.route('/api/status')
