@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Login · AutoReact by CHEATZ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#030711;--purple:#8b5cf6;--purple2:#6d28d9;
+  --cyan:#22d3ee;--gold:#f59e0b;--green:#10b981;--red:#f43f5e;
+  --text:#f8fafc;--muted:#94a3b8;--border:rgba(99,102,241,.2);
+  --input:rgba(255,255,255,.05);
+}
+html,body{height:100%}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
+  display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+
+/* BG */
+.orbs{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.orb{position:absolute;border-radius:50%;filter:blur(90px);animation:drift 20s ease-in-out infinite alternate}
+.o1{width:550px;height:550px;background:rgba(109,40,217,.14);top:-200px;left:-150px}
+.o2{width:450px;height:450px;background:rgba(6,182,212,.09);bottom:-200px;right:-150px;animation-delay:-10s}
+.o3{width:300px;height:300px;background:rgba(245,158,11,.07);top:40%;left:40%;animation-delay:-5s}
+@keyframes drift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,30px) scale(1.1)}}
+
+/* CARD */
+.card{
+  position:relative;z-index:1;
+  width:min(420px,100%);
+  background:rgba(8,12,32,.95);
+  border:1px solid rgba(139,92,246,.3);
+  border-radius:24px;padding:40px 36px;
+  box-shadow:0 32px 80px rgba(0,0,0,.6),
+             0 0 0 1px rgba(139,92,246,.1),
+             inset 0 1px 0 rgba(255,255,255,.04);
+  animation:up .5s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes up{from{transform:translateY(40px) scale(.95);opacity:0}to{transform:none;opacity:1}}
+
+/* LOGO */
+.logo{text-align:center;margin-bottom:32px}
+.logo-icon{
+  width:64px;height:64px;border-radius:18px;
+  background:linear-gradient(135deg,var(--purple2),var(--purple));
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:1.8rem;margin-bottom:14px;
+  box-shadow:0 0 32px rgba(139,92,246,.5);
+}
+.logo-name{
+  font-family:'Outfit',sans-serif;font-size:1.7rem;font-weight:900;
+  background:linear-gradient(135deg,#c4b5fd,var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  letter-spacing:-.02em;
+}
+.logo-sub{font-size:.8rem;color:var(--muted);margin-top:4px;letter-spacing:.06em}
+.dev-tag{
+  display:inline-flex;align-items:center;gap:5px;margin-top:10px;
+  padding:4px 12px;border-radius:999px;font-size:.72rem;font-weight:700;
+  background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.28);
+  color:var(--gold);letter-spacing:.06em;text-transform:uppercase;
+}
+
+/* FORM */
+.form-title{
+  font-family:'Outfit',sans-serif;font-size:1.15rem;font-weight:700;
+  margin-bottom:6px;
+}
+.form-sub{font-size:.83rem;color:var(--muted);margin-bottom:24px;line-height:1.5}
+
+.field{margin-bottom:16px}
+.field label{display:block;font-size:.8rem;font-weight:500;color:var(--muted);margin-bottom:6px}
+.field .input-wrap{position:relative}
+.field input{
+  width:100%;padding:12px 16px;
+  background:var(--input);border:1px solid var(--border);border-radius:11px;
+  color:var(--text);font-family:'Inter',sans-serif;font-size:.93rem;outline:none;
+  transition:border-color .2s,background .2s;
+}
+.field input:focus{border-color:rgba(139,92,246,.6);background:rgba(139,92,246,.07)}
+.field input::placeholder{color:rgba(148,163,184,.4)}
+.toggle-pass{
+  position:absolute;right:13px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--muted);cursor:pointer;font-size:.95rem;
+  transition:color .2s;
+}
+.toggle-pass:hover{color:var(--text)}
+
+.btn-login{
+  width:100%;padding:13px;margin-top:8px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,var(--purple2),var(--purple));
+  color:#fff;font-family:'Outfit',sans-serif;font-size:1rem;font-weight:700;
+  cursor:pointer;transition:all .25s;
+  box-shadow:0 6px 24px rgba(109,40,217,.38);
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.btn-login:hover:not(:disabled){
+  box-shadow:0 8px 32px rgba(109,40,217,.58);transform:translateY(-1px);
+}
+.btn-login:disabled{opacity:.45;cursor:not-allowed;transform:none}
+
+/* ERROR */
+.err-box{
+  padding:10px 14px;border-radius:10px;margin-bottom:16px;
+  background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.3);
+  color:#f43f5e;font-size:.83rem;display:none;
+  animation:shake .3s ease;
+}
+.err-box.show{display:block}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+/* SPINNER */
+.spin{display:inline-block;width:16px;height:16px;
+  border:2px solid rgba(255,255,255,.3);border-top-color:#fff;
+  border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* FOOTER */
+.footer{text-align:center;margin-top:24px;font-size:.75rem;color:rgba(148,163,184,.5)}
+.footer a{color:rgba(139,92,246,.7);text-decoration:none}
+.footer a:hover{color:var(--purple)}
+</style>
+</head>
+<body>
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<div class="card">
+  <!-- Logo -->
+  <div class="logo">
+    <div class="logo-icon">🤖</div>
+    <div class="logo-name">AutoReact</div>
+    <div class="logo-sub">BOT DASHBOARD</div>
+    <div class="dev-tag">⚡ DEVELOPED BY CHEATZ</div>
+  </div>
+
+  <!-- Error -->
+  <div class="err-box" id="errBox"></div>
+
+  <!-- Form -->
+  <div class="form-title">Welcome back</div>
+  <div class="form-sub">Sign in to manage your Telegram bots.</div>
+
+  <div class="field">
+    <label>Username</label>
+    <input type="text" id="iUser" placeholder="admin" autocomplete="username" autofocus/>
+  </div>
+
+  <div class="field">
+    <label>Password</label>
+    <div class="input-wrap">
+      <input type="password" id="iPass" placeholder="••••••••" autocomplete="current-password"/>
+      <button class="toggle-pass" type="button" onclick="togglePass()" id="eyeBtn">👁</button>
+    </div>
+  </div>
+
+  <button class="btn-login" id="btnLogin" onclick="doLogin()">
+    Sign In
+  </button>
+
+  <div class="footer">
+    Need help? <a href="https://t.me/User_88881" target="_blank">Contact @User_88881</a>
+  </div>
+</div>
+
+<script>
+function togglePass(){
+  const inp=document.getElementById('iPass');
+  const btn=document.getElementById('eyeBtn');
+  if(inp.type==='password'){inp.type='text';btn.textContent='🙈'}
+  else{inp.type='password';btn.textContent='👁'}
+}
+function showErr(msg){
+  const b=document.getElementById('errBox');
+  b.textContent=msg;b.classList.add('show');
+  setTimeout(()=>b.classList.remove('show'),4000);
+}
+async function doLogin(){
+  const user=document.getElementById('iUser').value.trim();
+  const pass=document.getElementById('iPass').value.trim();
+  if(!user||!pass){showErr('Enter username and password');return}
+  const btn=document.getElementById('btnLogin');
+  btn.disabled=true;
+  btn.innerHTML='<span class="spin"></span> Signing in…';
+  try{
+    const r=await fetch('/login',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:user,password:pass})
+    });
+    const d=await r.json();
+    if(d.error){showErr(d.error);return}
+    // Success — redirect
+    window.location.href='/';
+  }catch{
+    showErr('Network error. Try again.');
+  }finally{
+    btn.disabled=false;btn.innerHTML='Sign In';
+  }
+}
+// Enter key
+document.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+</script>
+</body>
+</html>

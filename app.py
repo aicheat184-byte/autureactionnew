@@ -3,7 +3,9 @@ import threading
 import json
 import os
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify
+from functools import wraps
+from flask import Flask, render_template, request, jsonify, session, redirect
+from werkzeug.security import generate_password_hash, check_password_hash
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import SendReactionRequest
@@ -15,7 +17,7 @@ from telethon.errors import (
 )
 
 app = Flask(__name__)
-app.secret_key = 'cheatz-autoreact-2026'
+app.secret_key = os.environ.get('SECRET_KEY', 'cheatz-autoreact-secure-2026')
 
 # ── Config ─────────────────────────────────────────────────
 API_ID        = 2040
@@ -23,8 +25,9 @@ API_HASH      = 'b18441a1ff607e10a989891a5462e627'
 DEFAULT_REACT = os.environ.get('REACTION', '\U0001f64f')
 DELAY         = float(os.environ.get('DELAY', '0.5'))
 ACCOUNTS_FILE = 'accounts.json'
-TARGETS_FILE  = 'targets.json'   # format: {phone: {key: {id, name}}}
+TARGETS_FILE  = 'targets.json'
 CONFIG_FILE   = 'config.json'
+USERS_FILE    = 'users.json'
 PORT          = int(os.environ.get('PORT', 5000))
 CONTACT       = 'https://t.me/User_88881'
 
@@ -33,7 +36,7 @@ running_bots   = {}
 pending_logins = {}
 
 
-# ── Storage helpers ────────────────────────────────────────
+# ── Storage ────────────────────────────────────────────────
 def load_accounts():
     if os.path.exists(ACCOUNTS_FILE):
         with open(ACCOUNTS_FILE, 'r', encoding='utf-8') as f:
@@ -45,7 +48,6 @@ def save_accounts(data):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 def load_targets():
-    """Returns {phone: {key: {id, name}}}"""
     if os.path.exists(TARGETS_FILE):
         with open(TARGETS_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -60,9 +62,7 @@ def get_acc_targets(phone):
 
 def set_acc_target(phone, key, target):
     t = load_targets()
-    if phone not in t:
-        t[phone] = {}
-    t[phone][key] = target
+    t.setdefault(phone, {})[key] = target
     save_targets(t)
 
 def del_acc_target_db(phone, key):
@@ -83,6 +83,60 @@ def save_config(data):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
+# ── User Management ────────────────────────────────────────
+def load_users():
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    admin_user = os.environ.get('ADMIN_USERNAME', 'admin')
+    admin_pass = os.environ.get('ADMIN_PASSWORD', 'cheatz2026')
+    users = {
+        admin_user: {
+            'password': generate_password_hash(admin_pass),
+            'role': 'admin',
+            'phone': None,
+            'display_name': 'Administrator'
+        }
+    }
+    save_users(users)
+    return users
+
+def save_users(data):
+    with open(USERS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+# ── Auth Decorators ────────────────────────────────────────
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'username' not in session:
+            if request.is_json or request.path.startswith('/api/'):
+                return jsonify({'error': 'Unauthorized', 'login': True}), 401
+            return redirect('/login')
+        return f(*args, **kwargs)
+    return decorated
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if session.get('role') != 'admin':
+            if request.is_json or request.path.startswith('/api/'):
+                return jsonify({'error': 'Admin required'}), 403
+            return redirect('/')
+        return f(*args, **kwargs)
+    return decorated
+
+def get_visible_accounts():
+    """Accounts visible to current session user."""
+    all_acc = load_accounts()
+    if session.get('role') == 'admin':
+        return all_acc
+    user_phone = session.get('phone')
+    if user_phone and user_phone in all_acc:
+        return {user_phone: all_acc[user_phone]}
+    return {}
+
 
 # ── Bot Runner ─────────────────────────────────────────────
 async def run_bot(phone, session_string):
@@ -99,26 +153,21 @@ async def run_bot(phone, session_string):
 
         running_bots[phone]['client'] = client
         running_bots[phone]['status'] = 'running'
-        _reacted = set()  # deduplicate: avoid double-react same msg
+        _reacted = set()
 
-        # ── React to ALL messages in target groups ──────────────────
         @client.on(events.NewMessage)
         async def react(event):
-            # Per-account target check
             acc_targets = get_acc_targets(phone)
             if not acc_targets:
-                return  # No targets configured
+                return
             target_ids = {t['id'] for t in acc_targets.values()}
             if event.chat_id not in target_ids:
                 return
-
             msg = event.message
             if not msg or not msg.id:
                 return
-            # Skip service messages (join/leave/pin/etc.)
             if hasattr(msg, 'action') and msg.action:
                 return
-            # Deduplicate
             key = (event.chat_id, msg.id)
             if key in _reacted:
                 return
@@ -136,8 +185,8 @@ async def run_bot(phone, session_string):
                 ))
                 running_bots[phone]['react_count'] = \
                     running_bots[phone].get('react_count', 0) + 1
-                sender = getattr(event, 'sender_id', 'channel')
-                print(f"[{phone}] {cur_reaction} Msg#{msg.id} from={sender}")
+                sender = getattr(event, 'sender_id', 'ch')
+                print(f"[{phone}] {cur_reaction} #{msg.id} from={sender}")
             except FloodWaitError as e:
                 print(f"[{phone}] FloodWait {e.seconds}s")
                 await asyncio.sleep(e.seconds)
@@ -146,9 +195,8 @@ async def run_bot(phone, session_string):
                 if 'REACTION_INVALID' not in err and 'same' not in err.lower():
                     print(f"[{phone}] Err: {err}")
 
-        print(f"[Bot] {phone} started — reacting ALL msgs in {len(get_acc_targets(phone))} target(s)")
+        print(f"[Bot] {phone} started — {len(get_acc_targets(phone))} target(s)")
         await client.run_until_disconnected()
-
     except Exception as e:
         print(f"[Bot] {phone} error: {e}")
     finally:
@@ -187,12 +235,48 @@ def _stop_bot(phone):
         running_bots[phone]['status'] = 'stopped'
 
 
-# ── Web Routes ─────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════
+# AUTH ROUTES
+# ══════════════════════════════════════════════════════════
+@app.route('/login', methods=['GET'])
+def login_page():
+    if 'username' in session:
+        return redirect('/')
+    return render_template('login.html')
+
+@app.route('/login', methods=['POST'])
+def do_login():
+    data     = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    if not username or not password:
+        return jsonify({'error': 'Username and password required'}), 400
+    users = load_users()
+    user  = users.get(username)
+    if not user or not check_password_hash(user['password'], password):
+        return jsonify({'error': 'Invalid username or password'}), 401
+    session.permanent = True
+    session['username']     = username
+    session['role']         = user['role']
+    session['phone']        = user.get('phone')
+    session['display_name'] = user.get('display_name', username)
+    return jsonify({'status': 'ok', 'role': user['role']})
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
+
+
+# ══════════════════════════════════════════════════════════
+# MAIN ROUTES
+# ══════════════════════════════════════════════════════════
 @app.route('/')
+@login_required
 def index():
-    accounts = load_accounts()
+    accounts    = get_visible_accounts()
     all_targets = load_targets()
-    config  = load_config()
+    config      = load_config()
     for phone, data in accounts.items():
         bot = running_bots.get(phone)
         data['status']      = bot['status'] if bot else 'stopped'
@@ -200,55 +284,65 @@ def index():
         data['targets']     = all_targets.get(phone, {})
     total   = len(accounts)
     running = sum(1 for p in accounts if running_bots.get(p, {}).get('status') == 'running')
-    return render_template('index.html', accounts=accounts,
-                           config=config, total=total, running=running,
+    return render_template('index.html',
+                           accounts=accounts, config=config,
+                           total=total, running=running,
                            reaction=config.get('reaction', DEFAULT_REACT),
-                           contact=CONTACT)
+                           contact=CONTACT,
+                           current_user=session.get('username'),
+                           current_role=session.get('role'),
+                           display_name=session.get('display_name', session.get('username')))
 
 
 @app.route('/api/status')
+@login_required
 def api_status():
-    accounts   = load_accounts()
+    accounts    = get_visible_accounts()
     all_targets = load_targets()
     out = {}
     for phone, data in accounts.items():
         bot = running_bots.get(phone)
         out[phone] = {
-            'name':        data.get('name', ''),
-            'username':    data.get('username', ''),
-            'status':      bot['status'] if bot else 'stopped',
-            'react_count': bot.get('react_count', 0) if bot else 0,
+            'name':         data.get('name', ''),
+            'username':     data.get('username', ''),
+            'status':       bot['status'] if bot else 'stopped',
+            'react_count':  bot.get('react_count', 0) if bot else 0,
             'target_count': len(all_targets.get(phone, {})),
         }
     return jsonify(out)
 
 
 @app.route('/api/start/<path:phone>', methods=['POST'])
+@login_required
 def api_start(phone):
-    accounts = load_accounts()
+    accounts = get_visible_accounts()
     if phone not in accounts:
-        return jsonify({'error': 'Account not found'}), 404
+        return jsonify({'error': 'Not found or no permission'}), 403
     bot = running_bots.get(phone)
     if bot and bot['status'] in ('running', 'starting'):
         return jsonify({'status': bot['status']})
-    _start_bot_thread(phone, accounts[phone]['session_string'])
+    _start_bot_thread(phone, load_accounts()[phone]['session_string'])
     return jsonify({'status': 'starting'})
 
 
 @app.route('/api/stop/<path:phone>', methods=['POST'])
+@login_required
 def api_stop(phone):
+    if phone not in get_visible_accounts():
+        return jsonify({'error': 'No permission'}), 403
     _stop_bot(phone)
     return jsonify({'status': 'stopped'})
 
 
 @app.route('/api/delete/<path:phone>', methods=['DELETE'])
+@login_required
+@admin_required
 def api_delete(phone):
     _stop_bot(phone)
     accounts = load_accounts()
     accounts.pop(phone, None)
     save_accounts(accounts)
     running_bots.pop(phone, None)
-    # remove targets for this account
     t = load_targets()
     t.pop(phone, None)
     save_targets(t)
@@ -257,20 +351,23 @@ def api_delete(phone):
 
 # ── Per-Account Target Routes ──────────────────────────────
 @app.route('/api/accounts/<path:phone>/targets', methods=['GET'])
+@login_required
 def get_targets_api(phone):
+    if phone not in get_visible_accounts():
+        return jsonify({'error': 'No permission'}), 403
     return jsonify(get_acc_targets(phone))
 
 
 @app.route('/api/accounts/<path:phone>/targets', methods=['POST'])
+@login_required
 def add_target_api(phone):
+    if phone not in get_visible_accounts():
+        return jsonify({'error': 'No permission'}), 403
     data      = request.json
     input_val = data.get('input', '').strip()
     name      = data.get('name', '').strip()
-
     if not input_val:
         return jsonify({'error': 'Chat ID or link required'}), 400
-
-    # ── Direct numeric Chat ID ────────────────────────────
     clean = input_val.lstrip('-')
     if clean.isdigit():
         chat_id     = int(input_val)
@@ -278,49 +375,42 @@ def add_target_api(phone):
         key         = str(chat_id)
         set_acc_target(phone, key, {'id': chat_id, 'name': target_name})
         return jsonify({'status': 'added', 'id': chat_id, 'name': target_name, 'key': key})
-
-    # ── Resolve link / @username using running bot ─────────
-    bot = running_bots.get(phone)
+    # Resolve via running bot
+    bot = running_bots.get(phone) or next(
+        (b for b in running_bots.values() if b.get('client') and b.get('status') == 'running'), None)
     if not bot or not bot.get('client'):
-        # Try any running bot to resolve
-        for p, b in running_bots.items():
-            if b.get('client') and b.get('status') == 'running':
-                bot = b
-                break
-    if not bot or not bot.get('client'):
-        return jsonify({'error': 'Start the bot first to resolve links/usernames'}), 400
-
-    client = bot['client']
-    loop   = bot['loop']
-
+        return jsonify({'error': 'Start the bot first to resolve links'}), 400
     try:
-        entity = asyncio.run_coroutine_threadsafe(
-            client.get_entity(input_val), loop
-        ).result(timeout=15)
-
+        entity      = asyncio.run_coroutine_threadsafe(
+            bot['client'].get_entity(input_val), bot['loop']).result(timeout=15)
         chat_id     = get_peer_id(entity)
         entity_name = getattr(entity, 'title', None) or getattr(entity, 'username', str(chat_id))
         target_name = name or entity_name
         key         = str(chat_id)
         set_acc_target(phone, key, {'id': chat_id, 'name': target_name})
         return jsonify({'status': 'added', 'id': chat_id, 'name': target_name, 'key': key})
-
     except Exception as e:
         return jsonify({'error': f'Cannot resolve: {e}'}), 400
 
 
 @app.route('/api/accounts/<path:phone>/targets/<key>', methods=['DELETE'])
+@login_required
 def remove_target_api(phone, key):
+    if phone not in get_visible_accounts():
+        return jsonify({'error': 'No permission'}), 403
     del_acc_target_db(phone, key)
     return jsonify({'status': 'deleted'})
 
 
 # ── Config Routes ──────────────────────────────────────────
 @app.route('/api/config', methods=['GET'])
+@login_required
 def get_config():
     return jsonify(load_config())
 
 @app.route('/api/config', methods=['POST'])
+@login_required
+@admin_required
 def set_config():
     data   = request.json
     config = load_config()
@@ -330,8 +420,71 @@ def set_config():
     return jsonify({'status': 'saved', **config})
 
 
+# ── User Management (Admin Only) ───────────────────────────
+@app.route('/api/users', methods=['GET'])
+@login_required
+@admin_required
+def get_users():
+    users = load_users()
+    return jsonify({u: {k: v for k, v in d.items() if k != 'password'}
+                    for u, d in users.items()})
+
+@app.route('/api/users', methods=['POST'])
+@login_required
+@admin_required
+def create_user():
+    data     = request.json
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    role     = data.get('role', 'user')
+    phone    = data.get('phone', None) or None
+    display  = data.get('display_name', username)
+    if not username or not password:
+        return jsonify({'error': 'Username and password required'}), 400
+    if role not in ('admin', 'user'):
+        return jsonify({'error': 'Role must be admin or user'}), 400
+    users = load_users()
+    if username in users:
+        return jsonify({'error': 'Username already exists'}), 409
+    users[username] = {
+        'password':     generate_password_hash(password),
+        'role':         role,
+        'phone':        phone,
+        'display_name': display
+    }
+    save_users(users)
+    return jsonify({'status': 'created', 'username': username, 'role': role})
+
+@app.route('/api/users/<username>', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_user(username):
+    if username == session.get('username'):
+        return jsonify({'error': 'Cannot delete yourself'}), 400
+    users = load_users()
+    users.pop(username, None)
+    save_users(users)
+    return jsonify({'status': 'deleted'})
+
+@app.route('/api/users/<username>/password', methods=['POST'])
+@login_required
+@admin_required
+def change_password(username):
+    new_pass = request.json.get('password', '').strip()
+    if not new_pass:
+        return jsonify({'error': 'Password required'}), 400
+    users = load_users()
+    if username not in users:
+        return jsonify({'error': 'User not found'}), 404
+    users[username]['password'] = generate_password_hash(new_pass)
+    save_users(users)
+    return jsonify({'status': 'updated'})
+
+
 # ── Login Flow ─────────────────────────────────────────────
 @app.route('/api/login/send-code', methods=['POST'])
+@login_required
+@admin_required
 def send_code():
     phone = request.json.get('phone', '').strip()
     if not phone:
@@ -358,11 +511,11 @@ def send_code():
 
 
 @app.route('/api/login/verify-otp', methods=['POST'])
+@login_required
+@admin_required
 def verify_otp():
-    data  = request.json
-    phone = data.get('phone', '').strip()
-    code  = data.get('code', '').strip()
-    p     = pending_logins.get(phone)
+    data, phone, code = request.json, request.json.get('phone','').strip(), request.json.get('code','').strip()
+    p = pending_logins.get(phone)
     if not p:
         return jsonify({'error': 'Session expired. Resend code.'}), 400
     try:
@@ -379,11 +532,11 @@ def verify_otp():
 
 
 @app.route('/api/login/verify-2fa', methods=['POST'])
+@login_required
+@admin_required
 def verify_2fa():
-    data     = request.json
-    phone    = data.get('phone', '').strip()
-    password = data.get('password', '').strip()
-    p        = pending_logins.get(phone)
+    data, phone, password = request.json, request.json.get('phone','').strip(), request.json.get('password','').strip()
+    p = pending_logins.get(phone)
     if not p:
         return jsonify({'error': 'Session expired'}), 400
     try:
@@ -422,6 +575,7 @@ def health():
 
 # ── Auto-Start ─────────────────────────────────────────────
 def autostart():
+    load_users()  # init users file
     accounts = load_accounts()
     if not accounts:
         ss    = os.environ.get('SESSION_STRING', '')
@@ -432,7 +586,6 @@ def autostart():
                                'session_string': ss,
                                'added_at': datetime.utcnow().isoformat()}
             save_accounts(accounts)
-            # Default target
             default_target = int(os.environ.get('TARGET_CHAT_ID', '-1002199457550'))
             set_acc_target(phone, str(default_target),
                            {'id': default_target, 'name': 'Default Group'})

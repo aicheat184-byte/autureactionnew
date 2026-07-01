@@ -69,6 +69,47 @@ header{
 .dev-badge{padding:5px 11px;border-radius:999px;font-size:.7rem;font-weight:700;
   background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.28);color:var(--gold);
   letter-spacing:.06em;text-transform:uppercase}
+.user-chip{display:flex;align-items:center;gap:7px;
+  padding:5px 12px;border-radius:999px;
+  background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.22)}
+.user-av{width:22px;height:22px;border-radius:50%;
+  background:linear-gradient(135deg,var(--purple2),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  font-size:.72rem;font-weight:800;color:#fff;flex-shrink:0}
+.user-name{font-size:.78rem;font-weight:600;color:var(--text);max-width:90px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.role-tag{font-size:.62rem;font-weight:800;padding:2px 6px;border-radius:5px;
+  letter-spacing:.08em}
+.role-tag.admin{background:rgba(245,158,11,.2);color:var(--gold)}
+.role-tag.user{background:rgba(34,211,238,.1);color:var(--cyan)}
+.logout-btn{padding:5px 12px;border-radius:999px;font-size:.76rem;font-weight:600;
+  background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);color:var(--red);
+  text-decoration:none;transition:all .2s;white-space:nowrap}
+.logout-btn:hover{background:rgba(244,63,94,.2);border-color:rgba(244,63,94,.4)}
+.usr-mgr-btn{padding:6px 13px;border-radius:999px;border:1px solid rgba(251,191,36,.3);
+  background:rgba(251,191,36,.08);color:#fbbf24;font-size:.77rem;font-weight:700;
+  cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif}
+.usr-mgr-btn:hover{background:rgba(251,191,36,.18)}
+/* User Mgr Modal */
+.user-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;max-height:240px;overflow-y:auto}
+.user-row{display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border-radius:10px;
+  background:rgba(255,255,255,.03);border:1px solid var(--border)}
+.ur-name{flex:1;font-weight:600;font-size:.88rem}
+.ur-phone{font-size:.75rem;color:var(--cyan)}
+.ur-role{font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:5px;letter-spacing:.06em}
+.ur-role.admin{background:rgba(245,158,11,.2);color:var(--gold)}
+.ur-role.user{background:rgba(34,211,238,.1);color:var(--cyan)}
+.ur-del{margin-left:auto;width:28px;height:28px;border-radius:7px;border:1px solid rgba(244,63,94,.2);
+  background:rgba(244,63,94,.07);color:var(--red);cursor:pointer;font-size:.8rem;
+  display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
+.ur-del:hover{background:rgba(244,63,94,.2)}
+.divider{height:1px;background:var(--border);margin:16px 0}
+.select-input{width:100%;padding:11px 14px;
+  background:var(--input);border:1px solid var(--border);
+  border-radius:10px;color:var(--text);font-family:'Inter',sans-serif;
+  font-size:.9rem;outline:none;transition:border-color .2s;appearance:none}
+.select-input:focus{border-color:rgba(139,92,246,.5);background:rgba(139,92,246,.06)}
 
 /* EMOJI BAR */
 .emoji-bar{
@@ -304,13 +345,62 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
     </div>
   </div>
   <div class="hdr-right">
-    <div class="chip">Accounts <strong id="hTotal">{{ total }}</strong></div>
-    <div class="chip g">Running <strong id="hRun">{{ running }}</strong></div>
-    <div class="chip">Emoji <strong id="hEmoji">{{ reaction }}</strong></div>
+    <div class="stat-chips">
+      <div class="chip">Accounts <strong id="hTotal">{{ total }}</strong></div>
+      <div class="chip g">Running <strong id="hRun">{{ running }}</strong></div>
+      <div class="chip">Emoji <strong id="hEmoji">{{ reaction }}</strong></div>
+    </div>
+    {% if current_role == 'admin' %}
+    <button class="usr-mgr-btn" onclick="openUserMgr()">👥 Users</button>
+    {% endif %}
     <a class="contact-btn" href="{{ contact }}" target="_blank">✈️ @User_88881</a>
-    <div class="dev-badge">⚡ CHEATZ</div>
+    <div class="user-chip">
+      <div class="user-av">{{ (display_name or current_user or 'U')[:1]|upper }}</div>
+      <span class="user-name">{{ display_name or current_user }}</span>
+      <span class="role-tag {{ current_role }}">{{ (current_role or 'user')|upper }}</span>
+    </div>
+    <a class="logout-btn" href="/logout">⮞ Logout</a>
   </div>
 </header>
+
+<!-- USER MANAGEMENT MODAL (admin only) -->
+<div class="overlay" id="umOverlay" onclick="bgClose(event,'umOverlay')">
+<div class="modal" style="width:min(480px,100%)">
+  <div class="mhd">
+    <span class="mtitle">👥 Manage Users</span>
+    <button class="mx" onclick="closeUserMgr()">✕</button>
+  </div>
+  <!-- User list -->
+  <div class="user-list" id="umList"></div>
+  <div class="divider"></div>
+  <!-- Add user form -->
+  <div class="sinfo" style="margin-bottom:14px;font-size:.82rem">➕ Add New Website User</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div class="field" style="margin-bottom:0">
+      <label>Username</label>
+      <input type="text" id="nuUser" placeholder="user1"/>
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label>Password</label>
+      <input type="password" id="nuPass" placeholder="••••••••"/>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+    <div class="field" style="margin-bottom:0">
+      <label>Role</label>
+      <select id="nuRole" class="select-input">
+        <option value="user">User</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label>Linked Phone (for user)</label>
+      <input type="text" id="nuPhone" placeholder="+85512345678"/>
+    </div>
+  </div>
+  <button class="btn-prim" id="bCreateUser" onclick="createWebUser()" style="margin-top:16px">Add User</button>
+</div>
+</div>
 
 <!-- EMOJI PICKER -->
 <div class="emoji-bar">
@@ -695,7 +785,9 @@ async function setEmoji(e){
 const SL={running:'Running',starting:'Starting',stopped:'Stopped',error:'Error',auth_error:'Auth Error'};
 async function poll(){
   try{
-    const d=await(await fetch('/api/status')).json();
+    const res=await fetch('/api/status');
+    if(res.status===401){window.location.href='/login';return}
+    const d=await res.json();
     let run=0,tot=Object.keys(d).length;
     for(const[phone,info]of Object.entries(d)){
       const badge=document.querySelector(`[data-badge="${phone}"]`);
@@ -718,6 +810,59 @@ async function poll(){
     document.getElementById('hTotal').textContent=tot;
     document.getElementById('hRun').textContent=run;
   }catch{}
+}
+
+// ── User Management (Admin) ───────────────────────────────
+let allWebUsers={};
+async function openUserMgr(){
+  document.getElementById('umOverlay').classList.add('on');
+  await loadWebUsers();
+}
+function closeUserMgr(){document.getElementById('umOverlay').classList.remove('on')}
+async function loadWebUsers(){
+  const r=await fetch('/api/users');if(r.status===403)return;
+  allWebUsers=await r.json();
+  const list=document.getElementById('umList');
+  list.innerHTML='';
+  for(const[u,d]of Object.entries(allWebUsers)){
+    const row=document.createElement('div');row.className='user-row';
+    row.innerHTML=`
+      <div class="user-av" style="width:28px;height:28px;font-size:.8rem">${(d.display_name||u)[0].toUpperCase()}</div>
+      <div style="flex:1;min-width:0">
+        <div class="ur-name">${d.display_name||u} <span style="color:var(--muted);font-weight:400;font-size:.78rem">(${u})</span></div>
+        ${d.phone?`<div class="ur-phone">${d.phone}</div>`:''}
+      </div>
+      <span class="ur-role ${d.role}">${d.role.toUpperCase()}</span>
+      <button class="ur-del" onclick="delWebUser('${u}')" title="Delete">🗑</button>`;
+    list.appendChild(row);
+  }
+}
+async function delWebUser(u){
+  if(!confirm(`Delete user "${u}"?`))return;
+  const r=await fetch(`/api/users/${encodeURIComponent(u)}`,{method:'DELETE'});
+  const d=await r.json();
+  if(d.error){toast(d.error,'err');return}
+  toast(`User "${u}" deleted`,'ok');
+  await loadWebUsers();
+}
+async function createWebUser(){
+  const username=document.getElementById('nuUser').value.trim();
+  const password=document.getElementById('nuPass').value.trim();
+  const role=document.getElementById('nuRole').value;
+  const phone=document.getElementById('nuPhone').value.trim()||null;
+  if(!username||!password){toast('Username & password required','err');return}
+  setBtn('bCreateUser',true,'Add User');
+  try{
+    const r=await fetch('/api/users',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username,password,role,phone,display_name:username})});
+    const d=await r.json();
+    if(d.error){toast(d.error,'err');return}
+    toast(`User "${username}" created!`,'ok');
+    ['nuUser','nuPass','nuPhone'].forEach(id=>document.getElementById(id).value='');
+    await loadWebUsers();
+  }catch{toast('Network error','err')}
+  finally{setBtn('bCreateUser',false,'Add User')}
 }
 
 // Keyboard shortcuts
