@@ -254,6 +254,43 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
   .stats-row{grid-template-columns:1fr 1fr}
   .action-row{grid-template-columns:1fr 1fr}
 }
+
+/* Connect Wizard */
+.connect-card{background:var(--surface);border:1px solid var(--border);border-radius:22px;
+  padding:30px;backdrop-filter:blur(20px);animation:fadeUp .5s ease;
+  max-width:420px;margin:0 auto}
+.connect-header{text-align:center;margin-bottom:28px}
+.connect-icon{font-size:3rem;display:block;margin-bottom:12px;
+  animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.connect-title{font-family:'Outfit',sans-serif;font-size:1.5rem;font-weight:900;
+  background:linear-gradient(135deg,#c4b5fd,var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
+.connect-sub{font-size:.84rem;color:var(--muted);line-height:1.5}
+.steps-bar{display:flex;align-items:center;gap:6px;margin-bottom:26px;justify-content:center}
+.step-dot{width:32px;height:4px;border-radius:99px;background:rgba(255,255,255,.08);transition:all .4s}
+.step-dot.active{background:linear-gradient(135deg,var(--purple),var(--cyan));width:48px}
+.step-dot.done{background:var(--green);width:32px}
+.wiz-step{display:none;animation:fadeUp .35s ease}
+.wiz-step.active{display:block}
+.phone-row{display:flex;gap:8px}
+.phone-row input{flex:1}
+.otp-row{display:flex;gap:6px;justify-content:center;margin-bottom:16px}
+.otp-box{width:42px;height:52px;text-align:center;font-size:1.3rem;font-weight:800;
+  background:var(--input);border:1.5px solid var(--border);border-radius:10px;
+  color:var(--text);font-family:'Outfit',sans-serif;outline:none;transition:all .2s}
+.otp-box:focus{border-color:var(--purple);background:rgba(139,92,246,.08);
+  box-shadow:0 0 12px rgba(139,92,246,.2)}
+.resend-row{text-align:center;margin-top:12px}
+.resend-btn{background:none;border:none;color:var(--cyan);font-size:.78rem;font-weight:600;
+  cursor:pointer;padding:4px 8px;border-radius:6px;transition:all .2s}
+.resend-btn:hover{background:rgba(34,211,238,.1)}
+.resend-btn:disabled{color:var(--muted);cursor:default}
+.success-box{text-align:center;padding:20px}
+.success-icon{font-size:3rem;margin-bottom:10px;display:block}
+.success-name{font-family:'Outfit',sans-serif;font-size:1.2rem;font-weight:800;margin-bottom:4px}
+.success-phone{font-size:.85rem;color:var(--cyan)}
+.success-msg{font-size:.82rem;color:var(--muted);margin-top:10px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -376,12 +413,79 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
 </div>
 
 {% else %}
-<!-- NO ACCOUNT LINKED -->
-<div class="no-acc">
-  <div class="no-acc-icon">🤖</div>
-  <div class="no-acc-title">No Account Linked</div>
-  <div class="no-acc-sub">Your user account is not linked to a Telegram account yet.<br>Contact admin to link your phone number.</div>
-  <a class="no-acc-link" href="{{ contact }}" target="_blank">✈️ Contact Admin @User_88881</a>
+<!-- CONNECT TELEGRAM -->
+<div class="welcome">
+  <span class="welcome-emoji">🔗</span>
+  <div class="welcome-title">Connect Your Telegram</div>
+  <div class="welcome-sub">Link your Telegram account to start using AutoReact.</div>
+</div>
+
+<div class="connect-card">
+  <div class="steps-bar">
+    <div class="step-dot active" id="dot1"></div>
+    <div class="step-dot" id="dot2"></div>
+    <div class="step-dot" id="dot3"></div>
+  </div>
+
+  <!-- STEP 1: Phone -->
+  <div class="wiz-step active" id="step1">
+    <div class="connect-header">
+      <span class="connect-icon">📱</span>
+      <div class="connect-title">Phone Number</div>
+      <div class="connect-sub">Enter your Telegram phone number with country code</div>
+    </div>
+    <div class="field">
+      <label>Phone Number</label>
+      <input type="tel" id="wizPhone" placeholder="+855 93 687 814" autocomplete="tel"/>
+      <div class="hint">💡 Include country code. Example: +855 for Cambodia</div>
+    </div>
+    <button class="btn-prim" id="btnSendCode" onclick="wizSendCode()">Send Verification Code</button>
+  </div>
+
+  <!-- STEP 2: OTP -->
+  <div class="wiz-step" id="step2">
+    <div class="connect-header">
+      <span class="connect-icon">🔐</span>
+      <div class="connect-title">Verification Code</div>
+      <div class="connect-sub">Enter the code sent to your Telegram app</div>
+    </div>
+    <div class="otp-row" id="otpRow">
+      <input class="otp-box" maxlength="1" data-i="0"/>
+      <input class="otp-box" maxlength="1" data-i="1"/>
+      <input class="otp-box" maxlength="1" data-i="2"/>
+      <input class="otp-box" maxlength="1" data-i="3"/>
+      <input class="otp-box" maxlength="1" data-i="4"/>
+    </div>
+    <button class="btn-prim" id="btnVerifyOtp" onclick="wizVerifyOtp()">Verify Code</button>
+    <div class="resend-row">
+      <button class="resend-btn" id="btnResend" onclick="wizSendCode()" disabled>Resend code (<span id="resendTimer">60</span>s)</button>
+    </div>
+  </div>
+
+  <!-- STEP 2b: 2FA -->
+  <div class="wiz-step" id="step2fa">
+    <div class="connect-header">
+      <span class="connect-icon">🛡️</span>
+      <div class="connect-title">Two-Factor Password</div>
+      <div class="connect-sub">Your account has 2FA enabled. Enter your cloud password.</div>
+    </div>
+    <div class="field">
+      <label>2FA Password</label>
+      <input type="password" id="wiz2fa" placeholder="Your cloud password"/>
+    </div>
+    <button class="btn-prim" id="btnVerify2fa" onclick="wizVerify2fa()">Verify Password</button>
+  </div>
+
+  <!-- STEP 3: Success -->
+  <div class="wiz-step" id="step3">
+    <div class="success-box">
+      <span class="success-icon">🎉</span>
+      <div class="success-name" id="successName">Connected!</div>
+      <div class="success-phone" id="successPhone"></div>
+      <div class="success-msg">Your Telegram account is now linked.<br>The bot will start automatically!</div>
+    </div>
+    <button class="btn-prim" onclick="location.reload()" style="margin-top:16px">Go to Dashboard</button>
+  </div>
 </div>
 {% endif %}
 
@@ -539,6 +643,145 @@ document.getElementById('tInput')?.addEventListener('keydown',e=>{if(e.key==='En
 document.getElementById('tName')?.addEventListener('keydown',e=>{if(e.key==='Enter')addTarget()});
 
 setInterval(poll,3000);
+
+// ══════════════════════════════════════════════════════════
+// TELEGRAM CONNECT WIZARD
+// ══════════════════════════════════════════════════════════
+let wizPhoneVal='';
+let resendInterval=null;
+
+function wizGoStep(step){
+  document.querySelectorAll('.wiz-step').forEach(s=>s.classList.remove('active'));
+  const el=document.getElementById(step);
+  if(el)el.classList.add('active');
+  // Update dots
+  const dots={step1:'dot1',step2:'dot2',step2fa:'dot2',step3:'dot3'};
+  const order=['dot1','dot2','dot3'];
+  const activeI=order.indexOf(dots[step]||'dot1');
+  order.forEach((d,i)=>{
+    const dot=document.getElementById(d);
+    if(!dot)return;
+    dot.classList.remove('active','done');
+    if(i<activeI)dot.classList.add('done');
+    else if(i===activeI)dot.classList.add('active');
+  });
+}
+
+async function wizSendCode(){
+  const phone=document.getElementById('wizPhone')?.value.trim().replace(/\s/g,'')||wizPhoneVal;
+  if(!phone){toast('Enter phone number','err');return}
+  wizPhoneVal=phone;
+  setBtn('btnSendCode',true,'Send Verification Code');
+  try{
+    const r=await fetch('/api/login/send-code',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
+    const d=await r.json();
+    if(d.error){toast(d.error,'err');return}
+    toast('Code sent! Check Telegram','ok');
+    wizGoStep('step2');
+    startResendTimer();
+    // Focus first OTP box
+    setTimeout(()=>{const boxes=document.querySelectorAll('.otp-box');if(boxes[0])boxes[0].focus()},200);
+  }catch{toast('Network error','err')}
+  finally{setBtn('btnSendCode',false,'Send Verification Code')}
+}
+
+function startResendTimer(){
+  let sec=60;
+  const el=document.getElementById('resendTimer');
+  const btn=document.getElementById('btnResend');
+  if(btn)btn.disabled=true;
+  if(resendInterval)clearInterval(resendInterval);
+  resendInterval=setInterval(()=>{
+    sec--;
+    if(el)el.textContent=sec;
+    if(sec<=0){
+      clearInterval(resendInterval);
+      if(btn){btn.disabled=false;btn.textContent='Resend code'}
+    }
+  },1000);
+}
+
+// OTP box auto-advance
+document.querySelectorAll('.otp-box').forEach(box=>{
+  box.addEventListener('input',e=>{
+    const val=e.target.value;
+    if(val.length>=1){
+      e.target.value=val[val.length-1];
+      const i=parseInt(e.target.dataset.i);
+      const next=document.querySelector(`.otp-box[data-i="${i+1}"]`);
+      if(next)next.focus();
+      // Auto-submit when all filled
+      const all=[...document.querySelectorAll('.otp-box')].map(b=>b.value).join('');
+      if(all.length===5)wizVerifyOtp();
+    }
+  });
+  box.addEventListener('keydown',e=>{
+    if(e.key==='Backspace'&&!e.target.value){
+      const i=parseInt(e.target.dataset.i);
+      const prev=document.querySelector(`.otp-box[data-i="${i-1}"]`);
+      if(prev){prev.focus();prev.value=''}
+    }
+  });
+  // Handle paste
+  box.addEventListener('paste',e=>{
+    e.preventDefault();
+    const txt=(e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'').slice(0,5);
+    const boxes=document.querySelectorAll('.otp-box');
+    [...txt].forEach((c,i)=>{if(boxes[i])boxes[i].value=c});
+    if(txt.length===5)wizVerifyOtp();
+  });
+});
+
+async function wizVerifyOtp(){
+  const code=[...document.querySelectorAll('.otp-box')].map(b=>b.value).join('');
+  if(code.length<5){toast('Enter full 5-digit code','err');return}
+  setBtn('btnVerifyOtp',true,'Verify Code');
+  try{
+    const r=await fetch('/api/login/verify-otp',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone:wizPhoneVal,code})});
+    const d=await r.json();
+    if(d.error){toast(d.error,'err');return}
+    if(d.status==='need_2fa'){
+      toast('2FA required','inf');
+      wizGoStep('step2fa');
+      setTimeout(()=>document.getElementById('wiz2fa')?.focus(),200);
+      return;
+    }
+    wizSuccess(d);
+  }catch{toast('Network error','err')}
+  finally{setBtn('btnVerifyOtp',false,'Verify Code')}
+}
+
+async function wizVerify2fa(){
+  const pw=document.getElementById('wiz2fa')?.value.trim();
+  if(!pw){toast('Enter 2FA password','err');return}
+  setBtn('btnVerify2fa',true,'Verify Password');
+  try{
+    const r=await fetch('/api/login/verify-2fa',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone:wizPhoneVal,password:pw})});
+    const d=await r.json();
+    if(d.error){toast(d.error,'err');return}
+    wizSuccess(d);
+  }catch{toast('Network error','err')}
+  finally{setBtn('btnVerify2fa',false,'Verify Password')}
+}
+
+function wizSuccess(d){
+  wizGoStep('step3');
+  const n=document.getElementById('successName');
+  const p=document.getElementById('successPhone');
+  if(n)n.textContent=`${d.name||'Account'} Connected!`;
+  if(p)p.textContent=d.phone||wizPhoneVal;
+  toast('🎉 Telegram connected!','ok',5000);
+  if(resendInterval)clearInterval(resendInterval);
+}
+
+// Enter key for 2FA
+document.getElementById('wiz2fa')?.addEventListener('keydown',e=>{if(e.key==='Enter')wizVerify2fa()});
+document.getElementById('wizPhone')?.addEventListener('keydown',e=>{if(e.key==='Enter')wizSendCode()});
 </script>
 </body>
 </html>

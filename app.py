@@ -535,14 +535,18 @@ def change_password(username):
     return jsonify({'status': 'updated'})
 
 
-# ── Login Flow ─────────────────────────────────────────────
+# ── Login Flow (any logged-in user can connect Telegram) ───
 @app.route('/api/login/send-code', methods=['POST'])
 @login_required
-@admin_required
 def send_code():
     phone = request.json.get('phone', '').strip()
     if not phone:
         return jsonify({'error': 'Phone required'}), 400
+    # Non-admin users: check they don't already have a phone linked
+    if session.get('role') != 'admin':
+        existing_phone = session.get('phone')
+        if existing_phone and existing_phone in load_accounts():
+            return jsonify({'error': 'You already have a Telegram account connected'}), 400
     old = pending_logins.pop(phone, None)
     if old:
         try:
@@ -566,7 +570,6 @@ def send_code():
 
 @app.route('/api/login/verify-otp', methods=['POST'])
 @login_required
-@admin_required
 def verify_otp():
     data, phone, code = request.json, request.json.get('phone','').strip(), request.json.get('code','').strip()
     p = pending_logins.get(phone)
@@ -587,7 +590,6 @@ def verify_otp():
 
 @app.route('/api/login/verify-2fa', methods=['POST'])
 @login_required
-@admin_required
 def verify_2fa():
     data, phone, password = request.json, request.json.get('phone','').strip(), request.json.get('password','').strip()
     p = pending_logins.get(phone)
@@ -617,6 +619,14 @@ def _finish_login(phone, client, loop):
         loop.call_soon_threadsafe(loop.stop)
     except Exception:
         pass
+    # Auto-link phone to the current web user's account
+    username = session.get('username')
+    if username:
+        users = load_users()
+        if username in users:
+            users[username]['phone'] = phone
+            save_users(users)
+            session['phone'] = phone
     _start_bot_thread(phone, ss)
     return jsonify({'status': 'success', 'name': name,
                     'username': me.username or '', 'phone': phone})
