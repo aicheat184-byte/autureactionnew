@@ -99,13 +99,15 @@ async def run_bot(phone, session_string):
 
         running_bots[phone]['client'] = client
         running_bots[phone]['status'] = 'running'
+        _reacted = set()  # deduplicate: avoid double-react same msg
 
+        # ── React to ALL messages in target groups ──────────────────
         @client.on(events.NewMessage)
         async def react(event):
             # Per-account target check
             acc_targets = get_acc_targets(phone)
             if not acc_targets:
-                return  # No targets set — don't react
+                return  # No targets configured
             target_ids = {t['id'] for t in acc_targets.values()}
             if event.chat_id not in target_ids:
                 return
@@ -113,6 +115,17 @@ async def run_bot(phone, session_string):
             msg = event.message
             if not msg or not msg.id:
                 return
+            # Skip service messages (join/leave/pin/etc.)
+            if hasattr(msg, 'action') and msg.action:
+                return
+            # Deduplicate
+            key = (event.chat_id, msg.id)
+            if key in _reacted:
+                return
+            _reacted.add(key)
+            if len(_reacted) > 2000:
+                _reacted.clear()
+
             await asyncio.sleep(DELAY)
             try:
                 cur_reaction = load_config().get('reaction', DEFAULT_REACT)
@@ -121,19 +134,21 @@ async def run_bot(phone, session_string):
                     msg_id=msg.id,
                     reaction=[ReactionEmoji(emoticon=cur_reaction)]
                 ))
-                running_bots[phone]['react_count'] = running_bots[phone].get('react_count', 0) + 1
-                s = await event.get_sender()
-                name = getattr(s, 'first_name', str(event.sender_id))
-                print(f"[{phone}] {cur_reaction} Msg#{msg.id} {name}")
+                running_bots[phone]['react_count'] = \
+                    running_bots[phone].get('react_count', 0) + 1
+                sender = getattr(event, 'sender_id', 'channel')
+                print(f"[{phone}] {cur_reaction} Msg#{msg.id} from={sender}")
             except FloodWaitError as e:
+                print(f"[{phone}] FloodWait {e.seconds}s")
                 await asyncio.sleep(e.seconds)
             except Exception as ex:
                 err = str(ex)
                 if 'REACTION_INVALID' not in err and 'same' not in err.lower():
                     print(f"[{phone}] Err: {err}")
 
-        print(f"[Bot] {phone} started")
+        print(f"[Bot] {phone} started — reacting ALL msgs in {len(get_acc_targets(phone))} target(s)")
         await client.run_until_disconnected()
+
     except Exception as e:
         print(f"[Bot] {phone} error: {e}")
     finally:
