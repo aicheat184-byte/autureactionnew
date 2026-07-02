@@ -453,7 +453,7 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
     {% if acc.targets %}
       {% for key, t in acc.targets.items() %}
       <span class="ct-pill" id="tpill-{{ loop.index0 }}-{{ key }}">
-        <span class="ct-pill-name" title="{{ t.id }}">{{ t.name }}</span>
+        <span class="ct-pill-name" title="{{ t.id }}">{{ t.name }}{% if t.topic_name %} · {{ t.topic_name }}{% endif %}</span>
         <button class="ct-del" onclick="removeTarget('{{ phone }}','{{ key }}','{{ loop.index0 }}')">✕</button>
       </span>
       {% endfor %}
@@ -541,6 +541,13 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
   </div>
   <div class="field"><label>Display Name <span style="opacity:.5">(optional)</span></label>
     <input type="text" id="tName" placeholder="My Group"/></div>
+  <div class="field">
+    <label>Topic (optional)</label>
+    <select id="tTopic" disabled>
+      <option value="">No topic selected</option>
+    </select>
+    <div class="hint" id="tTopicHint">💡 If the chat is a forum, topics will appear after resolving the chat.</div>
+  </div>
   <button class="btn-prim" id="bAddTgt" onclick="addTarget()">Add Target ＋</button>
 </div>
 </div>

@@ -10,7 +10,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, R
 from werkzeug.security import generate_password_hash, check_password_hash
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-from telethon.tl.functions.messages import SendReactionRequest
+from telethon.tl.functions.messages import SendReactionRequest, GetForumTopicsRequest
 from telethon.tl.types import ReactionEmoji
 from telethon.utils import get_peer_id
 from telethon.errors import (
@@ -98,6 +98,64 @@ def load_config():
 def save_config(data):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def _get_bot_client(phone):
+    bot = running_bots.get(phone, {})
+    if bot.get('client') and bot.get('loop'):
+        return bot['client'], bot['loop']
+    return None, None
+
+
+def _fetch_forum_topics(client, loop, chat_id, limit=50):
+    try:
+        entity = asyncio.run_coroutine_threadsafe(
+            client.get_entity(chat_id), loop
+        ).result(timeout=15)
+        result = asyncio.run_coroutine_threadsafe(
+            client(GetForumTopicsRequest(entity, None, 0, 0, limit)),
+            loop
+        ).result(timeout=20)
+        topics = []
+        for topic in getattr(result, 'topics', []) or []:
+            if getattr(topic, 'id', None) is None:
+                continue
+            topics.append({
+                'id': topic.id,
+                'title': getattr(topic, 'title', '') or f'Topic {topic.id}'
+            })
+        return topics
+    except Exception:
+        return []
+
+
+def _resolve_target_input(phone, input_val):
+    clean = input_val.lstrip('-')
+    client, loop = _get_bot_client(phone)
+    if clean.isdigit():
+        chat_id = int(input_val)
+        info = {'id': chat_id, 'name': f'Group {chat_id}', 'topics': []}
+        if client:
+            try:
+                entity = asyncio.run_coroutine_threadsafe(
+                    client.get_entity(chat_id), loop
+                ).result(timeout=15)
+                entity_name = getattr(entity, 'title', None) or getattr(entity, 'username', None) or str(chat_id)
+                topics = _fetch_forum_topics(client, loop, chat_id)
+                info['name'] = entity_name
+                info['topics'] = topics
+            except Exception:
+                pass
+        return info
+    if not client:
+        raise ValueError('Start the bot first to resolve links')
+    entity = asyncio.run_coroutine_threadsafe(
+        client.get_entity(input_val), loop
+    ).result(timeout=15)
+    chat_id = get_peer_id(entity)
+    entity_name = getattr(entity, 'title', None) or getattr(entity, 'username', None) or str(chat_id)
+    topics = _fetch_forum_topics(client, loop, chat_id)
+    return {'id': chat_id, 'name': entity_name, 'topics': topics}
 
 
 # ── Schedule Helpers ───────────────────────────────────────
@@ -222,16 +280,31 @@ async def run_bot(phone, session_string):
             acc_targets = get_acc_targets(phone)
             if not acc_targets:
                 return
-            # Match target and find its key
-            target_key  = None
-            target_ids  = {}
-            for k, t in acc_targets.items():
-                target_ids[t['id']] = k
-            if event.chat_id not in target_ids:
-                return
-            target_key = target_ids[event.chat_id]
             msg = event.message
             if not msg or not msg.id:
+                return
+            thread_id = getattr(msg, 'message_thread_id', None)
+            if thread_id is None:
+                try:
+                    thread_id = msg.to_dict().get('message_thread_id')
+                except Exception:
+                    thread_id = None
+            matching_keys = [k for k, t in acc_targets.items() if t.get('id') == event.chat_id]
+            if not matching_keys:
+                return
+            target_key = None
+            for k in matching_keys:
+                t = acc_targets[k]
+                if 'topic_id' in t and thread_id == t['topic_id']:
+                    target_key = k
+                    break
+            if not target_key:
+                for k in matching_keys:
+                    t = acc_targets[k]
+                    if 'topic_id' not in t:
+                        target_key = k
+                        break
+            if not target_key:
                 return
             if hasattr(msg, 'action') and msg.action:
                 return
@@ -260,11 +333,14 @@ async def run_bot(phone, session_string):
                     running_bots[phone].get('react_count', 0) + 1
                 sender = getattr(event, 'sender_id', 'ch')
                 # Log activity
+                target = acc_targets.get(target_key, {})
                 activity_log.append({
                     'phone': phone,
                     'emoji': cur_reaction,
                     'msg_id': msg.id,
                     'chat_id': event.chat_id,
+                    'topic_id': target.get('topic_id'),
+                    'topic_name': target.get('topic_name'),
                     'sender': str(sender),
                     'ts': datetime.utcnow().isoformat() + 'Z'
                 })
@@ -491,7 +567,7 @@ def api_activity():
         phone_targets = targets.get(entry['phone'], {})
         chat_key = str(entry['chat_id'])
         tgt = phone_targets.get(chat_key, {})
-        entry['target_name'] = tgt.get('name', f"Chat {entry['chat_id']}")
+        entry['target_name'] = tgt.get('topic_name') or tgt.get('name', f"Chat {entry['chat_id']}")
     return jsonify(logs)
 
 
@@ -590,26 +666,44 @@ def add_target_api(phone):
     if not input_val:
         return jsonify({'error': 'Chat ID or link required'}), 400
     clean = input_val.lstrip('-')
+    topic_id    = data.get('topic_id')
+    topic_title = (data.get('topic_title') or '').strip()
     if clean.isdigit():
         chat_id     = int(input_val)
         target_name = name or f'Group {chat_id}'
         key         = str(chat_id)
-        set_acc_target(phone, key, {'id': chat_id, 'name': target_name})
-        return jsonify({'status': 'added', 'id': chat_id, 'name': target_name, 'key': key})
+        target      = {'id': chat_id, 'name': target_name}
+        if topic_id:
+            target['topic_id'] = int(topic_id)
+            target['topic_name'] = topic_title or f'Topic {topic_id}'
+        set_acc_target(phone, key, target)
+        return jsonify({
+            'status': 'added', 'id': chat_id, 'name': target_name,
+            'key': key,
+            'topic_id': target.get('topic_id'),
+            'topic_name': target.get('topic_name')
+        })
     # Resolve via running bot
-    bot = running_bots.get(phone) or next(
-        (b for b in running_bots.values() if b.get('client') and b.get('status') == 'running'), None)
-    if not bot or not bot.get('client'):
-        return jsonify({'error': 'Start the bot first to resolve links'}), 400
     try:
-        entity      = asyncio.run_coroutine_threadsafe(
-            bot['client'].get_entity(input_val), bot['loop']).result(timeout=15)
-        chat_id     = get_peer_id(entity)
-        entity_name = getattr(entity, 'title', None) or getattr(entity, 'username', str(chat_id))
+        resolved = _resolve_target_input(phone, input_val)
+        chat_id     = resolved['id']
+        entity_name = resolved['name']
         target_name = name or entity_name
-        key         = str(chat_id)
-        set_acc_target(phone, key, {'id': chat_id, 'name': target_name})
-        return jsonify({'status': 'added', 'id': chat_id, 'name': target_name, 'key': key})
+        if topic_id:
+            key = f'{chat_id}:{topic_id}'
+        else:
+            key = str(chat_id)
+        target      = {'id': chat_id, 'name': target_name}
+        if topic_id:
+            target['topic_id'] = int(topic_id)
+            target['topic_name'] = topic_title or f'Topic {topic_id}'
+        set_acc_target(phone, key, target)
+        return jsonify({
+            'status': 'added', 'id': chat_id, 'name': target_name,
+            'key': key,
+            'topic_id': target.get('topic_id'),
+            'topic_name': target.get('topic_name')
+        })
     except Exception as e:
         return jsonify({'error': f'Cannot resolve: {e}'}), 400
 
@@ -621,6 +715,58 @@ def remove_target_api(phone, key):
         return jsonify({'error': 'No permission'}), 403
     del_acc_target_db(phone, key)
     return jsonify({'status': 'deleted'})
+
+
+@app.route('/api/accounts/<path:phone>/targets/resolve', methods=['GET'])
+@login_required
+def resolve_target_api(phone):
+    if phone not in get_visible_accounts():
+        return jsonify({'error': 'No permission'}), 403
+    input_val = (request.args.get('input') or '').strip()
+    if not input_val:
+        return jsonify({'error': 'Input required'}), 400
+    try:
+        resolved = _resolve_target_input(phone, input_val)
+        return jsonify(resolved)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@app.route('/api/accounts/<path:phone>/targets/<key>/topics', methods=['GET'])
+@login_required
+def get_target_topics_api(phone, key):
+    if phone not in get_visible_accounts():
+        return jsonify({'error': 'No permission'}), 403
+    target = get_acc_targets(phone).get(key)
+    if not target:
+        return jsonify({'error': 'Target not found'}), 404
+    client, loop = _get_bot_client(phone)
+    if not client:
+        return jsonify({'error': 'Start the bot first to load topics'}), 400
+    topics = _fetch_forum_topics(client, loop, target['id'])
+    return jsonify({'chat_id': target['id'], 'topics': topics})
+
+
+@app.route('/api/accounts/<path:phone>/targets/<key>/topic', methods=['POST'])
+@login_required
+def set_target_topic_api(phone, key):
+    if phone not in get_visible_accounts():
+        return jsonify({'error': 'No permission'}), 403
+    data = request.json or {}
+    topic_id = data.get('topic_id')
+    topic_title = (data.get('topic_title') or '').strip()
+    targets = load_targets()
+    if phone not in targets or key not in targets[phone]:
+        return jsonify({'error': 'Target not found'}), 404
+    target = targets[phone][key]
+    if topic_id:
+        target['topic_id'] = int(topic_id)
+        target['topic_name'] = topic_title or target.get('topic_name') or f'Topic {topic_id}'
+    else:
+        target.pop('topic_id', None)
+        target.pop('topic_name', None)
+    save_targets(targets)
+    return jsonify({'status': 'saved', 'topic_id': target.get('topic_id'), 'topic_name': target.get('topic_name')})
 
 
 # ── Config Routes ──────────────────────────────────────────

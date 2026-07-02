@@ -393,7 +393,7 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
     {% if my_account.targets %}
       {% for key, t in my_account.targets.items() %}
       <span class="tpill" id="tp-{{ key }}">
-        <span class="tpill-name" title="{{ t.id }}">{{ t.name }}</span>
+        <span class="tpill-name" title="{{ t.id }}">{{ t.name }}{% if t.topic_name %} · {{ t.topic_name }}{% endif %}</span>
         <button class="tpill-del" onclick="removeTarget('{{ key }}')">✕</button>
       </span>
       {% endfor %}
@@ -516,6 +516,13 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
   </div>
   <div class="field"><label>Display Name <span style="opacity:.5">(optional)</span></label>
     <input type="text" id="tName" placeholder="My Group"/></div>
+  <div class="field">
+    <label>Topic (optional)</label>
+    <select id="tTopic" disabled>
+      <option value="">No topic selected</option>
+    </select>
+    <div class="hint" id="tTopicHint">💡 If the group is a forum, topics will appear after resolving the chat.</div>
+  </div>
   <button class="btn-prim" id="bAddTgt" onclick="addTarget()">Add Target</button>
 </div>
 </div>
@@ -594,28 +601,40 @@ async function stopBot(){
 // ── Target Modal ─────────────────────────────────────────
 function openTgtModal(){
   document.getElementById('tgtOverlay')?.classList.add('on');
+  document.getElementById('tInput')?.value='';
+  document.getElementById('tName')?.value='';
+  const topicSelect=document.getElementById('tTopic');
+  if(topicSelect){topicSelect.innerHTML='<option value="">No topic selected</option>';topicSelect.disabled=true;}
+  const hint=document.getElementById('tTopicHint');
+  if(hint){hint.textContent='💡 If the group is a forum, topics will appear after resolving the chat.'}
   setTimeout(()=>document.getElementById('tInput')?.focus(),100);
 }
 function closeTgtModal(){document.getElementById('tgtOverlay')?.classList.remove('on')}
 async function addTarget(){
   const input=document.getElementById('tInput').value.trim();
   const name=document.getElementById('tName').value.trim();
+  const topicSelect=document.getElementById('tTopic');
+  const topic_id=topicSelect?.value||null;
+  const topic_title=topic_id?topicSelect.options[topicSelect.selectedIndex].text.trim():'';
   if(!input){toast('Enter Chat ID or link','err');return}
   setBtn('bAddTgt',true,'Add Target');
   try{
+    const body={input,name};
+    if(topic_id){body.topic_id=topic_id;body.topic_title=topic_title}
     const r=await fetch(`/api/accounts/${encodeURIComponent(MY_PHONE)}/targets`,{
-      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input,name})});
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
     if(d.error){toast(d.error,'err');return}
     const pills=document.getElementById('targetPills');
     document.getElementById('t-empty')?.remove();
+    const spanTitle=d.topic_name?`${d.name} · ${d.topic_name}`:d.name;
     const p=document.createElement('span');p.className='tpill';p.id=`tp-${d.key}`;
-    p.innerHTML=`<span class="tpill-name" title="${d.id}">${d.name}</span>
+    p.innerHTML=`<span class="tpill-name" title="${d.id}">${spanTitle}</span>
       <button class="tpill-del" onclick="removeTarget('${d.key}')">✕</button>`;
     pills.appendChild(p);
     const cnt=document.getElementById('targetCount');
     if(cnt)cnt.textContent=parseInt(cnt.textContent||'0')+1;
-    closeTgtModal();toast(`✅ "${d.name}" added!`,'ok');
+    closeTgtModal();toast(`✅ "${spanTitle}" added!`,'ok');
   }catch{toast('Network error','err')}
   finally{setBtn('bAddTgt',false,'Add Target')}
 }
@@ -634,7 +653,35 @@ async function removeTarget(key){
 }
 
 // ── Emoji (per-account) ──────────────────────────────────
-async function setEmoji(e){
+async function resolveTargetTopics(){
+  const input=document.getElementById('tInput').value.trim();
+  const topicSelect=document.getElementById('tTopic');
+  const hint=document.getElementById('tTopicHint');
+  if(!input||!topicSelect){return}
+  topicSelect.disabled=true;
+  topicSelect.innerHTML='<option value="">Loading topics…</option>';
+  hint.textContent='💡 Resolving topics…';
+  fetch(`/api/accounts/${encodeURIComponent(MY_PHONE)}/targets/resolve?input=${encodeURIComponent(input)}`)
+    .then(r=>r.json())
+    .then(d=>{
+      if(d.error||!d.topics?.length){
+        topicSelect.innerHTML='<option value="">No forum topics found</option>';
+        topicSelect.disabled=true;
+        hint.textContent=d.error?`⚠️ ${d.error}`:'💡 No forum topics found for this chat.';
+        return;
+      }
+      topicSelect.innerHTML='<option value="">No topic selected</option>' + d.topics.map(t=>`<option value="${t.id}">${t.title}</option>`).join('');
+      topicSelect.disabled=false;
+      hint.textContent='💡 Select a topic to react only within that thread.';
+    })
+    .catch(()=>{
+      topicSelect.innerHTML='<option value="">No topics found</option>';
+      topicSelect.disabled=true;
+      hint.textContent='⚠️ Could not resolve topics';
+    });
+}
+
+function setEmoji(e){
   if(!MY_PHONE){toast('No account linked','err');return}
   try{
     const r=await fetch(`/api/accounts/${encodeURIComponent(MY_PHONE)}/emoji`,{
@@ -673,7 +720,8 @@ async function poll(){
 }
 
 // Keyboard
-document.getElementById('tInput')?.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('tName')?.focus()});
+document.getElementById('tInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){document.getElementById('tName')?.focus();resolveTargetTopics()}});
+document.getElementById('tInput')?.addEventListener('blur',()=>resolveTargetTopics());
 document.getElementById('tName')?.addEventListener('keydown',e=>{if(e.key==='Enter')addTarget()});
 
 setInterval(poll,3000);
