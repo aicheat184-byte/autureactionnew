@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: autoreact-bot
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: waitress-serve --host=0.0.0.0 --port=$PORT app:app
+    envVars:
+      - key: SESSION_STRING
+        sync: false
+      - key: PHONE
+        sync: false
+      - key: TARGET_CHAT_ID
+        sync: false
+      - key: REACTION
+        value: "\U0001f64f"
+      - key: DELAY
+        value: "0.5"
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: REGISTER_CODE
+        sync: false

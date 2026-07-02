@@ -4,6 +4,8 @@
 
 # Sensitive account data
 accounts.json
+users.json
+config.json
 
 # Python cache
 __pycache__/
