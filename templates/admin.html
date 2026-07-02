@@ -777,7 +777,23 @@ async function resetCount(phone){const r=await fetch(`/api/accounts/${encodeURIC
 async function pingBot(phone){toast('Pinging…','inf');const r=await fetch(`/api/ping/${encodeURIComponent(phone)}`);const d=await r.json();toast(d.connected?`✅ ${phone} connected (${d.status})`:`❌ ${phone} not connected`,(d.connected?'ok':'err'),4000)}
 
 // ── Emoji ─────────────────────────────────────────
-async function setEmoji(e){try{const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reaction:e})});const d=await r.json();if(d.error){toast(d.error,'err');return}document.getElementById('curEmo').textContent=e;document.querySelectorAll('.emo').forEach(b=>b.classList.toggle('sel',b.textContent===e));toast(`Default reaction → ${e}`,'ok')}catch{toast('Error','err')}}
+async function setEmoji(e){
+  // Optimistic UI: mark as selected immediately
+  document.querySelectorAll('.emo').forEach(b=>b.classList.remove('sel'));
+  const clickedBtn=[...document.querySelectorAll('.emo')].find(b=>b.textContent===e);
+  if(clickedBtn){clickedBtn.classList.add('sel');clickedBtn.style.transform='scale(1.3)';setTimeout(()=>clickedBtn.style.transform='',250)}
+  try{
+    const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reaction:e})});
+    const d=await r.json();
+    if(d.error){toast(d.error,'err');return}
+    // Use confirmed value from server response
+    const confirmed=d.reaction||e;
+    document.getElementById('curEmo').textContent=confirmed;
+    // Re-sync selection buttons with confirmed server value
+    document.querySelectorAll('.emo').forEach(b=>b.classList.toggle('sel',b.textContent===confirmed));
+    toast(`✅ Reaction set → ${confirmed}`,'ok');
+  }catch{toast('Network error — emoji not saved','err')}
+}
 
 // ── User Management ───────────────────────────────
 async function openUserMgr(){document.getElementById('umOverlay').classList.add('on');await loadWebUsers()}

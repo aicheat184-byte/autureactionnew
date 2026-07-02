@@ -24,8 +24,8 @@ app.secret_key = os.environ.get('SECRET_KEY', 'cheatz-autoreact-secure-2026')
 # ── Config ─────────────────────────────────────────────────
 API_ID        = 2040
 API_HASH      = 'b18441a1ff607e10a989891a5462e627'
-DEFAULT_REACT = os.environ.get('REACTION', '\U0001f64f')
-DEFAULT_EMOJI_LIST = ['\U0001f64f', '\u2764\ufe0f', '\U0001f525', '\U0001f44d', '\U0001f389']
+DEFAULT_REACT      = os.environ.get('REACTION', '\U0001f64f')   # 🙏
+DEFAULT_EMOJI_LIST = [os.environ.get('REACTION', '\U0001f64f')]  # Single emoji — no rotation by default
 DELAY         = float(os.environ.get('DELAY', '0.5'))
 ACCOUNTS_FILE = 'accounts.json'
 TARGETS_FILE  = 'targets.json'
@@ -85,8 +85,15 @@ def del_acc_target_db(phone, key):
 def load_config():
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    cfg = {'reaction': DEFAULT_REACT, 'emoji_list': DEFAULT_EMOJI_LIST}
+            cfg = json.load(f)
+        # Migrate: if emoji_list has >1 item but reaction is set, honour reaction only
+        if 'reaction' not in cfg:
+            cfg['reaction'] = DEFAULT_REACT
+        # Ensure emoji_list always exists (may be empty = no rotation)
+        if 'emoji_list' not in cfg:
+            cfg['emoji_list'] = []
+        return cfg
+    cfg = {'reaction': DEFAULT_REACT, 'emoji_list': []}  # No rotation by default
     save_config(cfg)
     return cfg
 
@@ -120,32 +127,41 @@ def _in_schedule(acc_data):
 
 
 def _pick_emoji(phone, acc_data, chat_id=None, target_key=None):
-    """Pick the next emoji for this phone — supports rotation & per-target override."""
-    # Per-target emoji override
+    """Pick emoji for this reaction — per-target override > per-account > global config."""
+    # 1. Per-target emoji override
     if target_key:
         targets = get_acc_targets(phone)
         tgt = targets.get(target_key, {})
         if tgt.get('emoji'):
             return tgt['emoji']
-    # Per-account emoji list (rotation)
+
+    # 2. Per-account emoji list (rotation, only when >1 item)
     emoji_list = acc_data.get('emoji_list') or []
-    if emoji_list and len(emoji_list) > 1:
+    if len(emoji_list) > 1:
         idx = _emoji_idx.get(phone, 0)
         emoji = emoji_list[idx % len(emoji_list)]
         _emoji_idx[phone] = (idx + 1) % len(emoji_list)
         return emoji
-    # Single per-account emoji
-    single = acc_data.get('reaction')
+    if len(emoji_list) == 1:
+        return emoji_list[0]  # Single per-account emoji — no rotation
+
+    # 3. Single per-account reaction override
+    single = acc_data.get('reaction', '').strip()
     if single:
         return single
-    # Global config
+
+    # 4. Global config — rotation only when list has >1 item
     cfg = load_config()
-    cfg_list = cfg.get('emoji_list') or []
-    if cfg_list and len(cfg_list) > 1:
+    cfg_list = [e for e in (cfg.get('emoji_list') or []) if e.strip()]
+    if len(cfg_list) > 1:
         idx = _emoji_idx.get('__global__', 0)
         emoji = cfg_list[idx % len(cfg_list)]
         _emoji_idx['__global__'] = (idx + 1) % len(cfg_list)
         return emoji
+    if len(cfg_list) == 1:
+        return cfg_list[0]  # Single global emoji — no rotation
+
+    # 5. Absolute fallback
     return cfg.get('reaction', DEFAULT_REACT)
 
 # ── User Management ────────────────────────────────────────
@@ -639,11 +655,20 @@ def set_config():
     data   = request.json
     config = load_config()
     if 'reaction' in data:
-        config['reaction'] = data['reaction']
+        new_emoji = data['reaction'].strip()
+        config['reaction']   = new_emoji
+        # ── KEY FIX: setting a single emoji clears the rotation list ──
+        config['emoji_list'] = []          # empty = no rotation, use reaction field
+        _emoji_idx.pop('__global__', None) # reset rotation index
     if 'emoji_list' in data:
         elist = data['emoji_list']
         if isinstance(elist, list):
-            config['emoji_list'] = [e.strip() for e in elist if e.strip()]
+            clean = [e.strip() for e in elist if str(e).strip()]
+            config['emoji_list'] = clean
+            # If list is set to a single item, also update reaction field
+            if len(clean) == 1:
+                config['reaction'] = clean[0]
+            _emoji_idx.pop('__global__', None)  # reset rotation index
     save_config(config)
     return jsonify({'status': 'saved', **config})
 
