@@ -15,6 +15,7 @@ from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import SendReactionRequest
 from telethon.tl.types import ReactionEmoji
+from telethon.utils import get_peer_id
 from telethon.errors import FloodWaitError
 
 # ====================================================
@@ -71,12 +72,24 @@ client = TelegramClient(
     system_lang_code = 'en'
 )
 
-@client.on(events.NewMessage(chats=TARGET_CHAT_ID))
+@client.on(events.NewMessage)
 async def auto_react(event):
     msg = event.message
     if not msg or not msg.id:
         return
 
+    chat_id = event.chat_id
+    if chat_id is None:
+        try:
+            chat = await event.get_input_chat()
+            chat_id = get_peer_id(chat)
+        except Exception:
+            chat_id = None
+
+    if chat_id != TARGET_CHAT_ID:
+        return
+
+    print(f"[Debug] NewMessage in target chat {chat_id} msg={msg.id} sender={event.sender_id}")
     await asyncio.sleep(DELAY)
 
     try:
