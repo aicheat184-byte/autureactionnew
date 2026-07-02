@@ -776,8 +776,44 @@ async function addTarget(){
   }catch{toast('Network error','err')}
   finally{setBtn('bAddTgt',false,'Add Target ＋')}
 }
-function removeTarget(phone,key,idx){if(!confirm('Remove this target?'))return;fetch(`/api/accounts/${encodeURIComponent(phone)}/targets/${key}`,{method:'DELETE'});document.getElementById(`tpill-${idx}-${key}`)?.remove();checkEmpty(phone);toast('Target removed','inf');fetchStats()}
-function removeTargetEl(phone,key,btn){if(!confirm('Remove this target?'))return;fetch(`/api/accounts/${encodeURIComponent(phone)}/targets/${key}`,{method:'DELETE'});const p=btn.closest('.ct-pill'),ct=p?.parentElement;p?.remove();if(ct&&!ct.querySelector('.ct-pill')){const e=document.createElement('span');e.className='ct-empty';e.textContent='No targets — click ＋';ct.appendChild(e)}toast('Target removed','inf');fetchStats()}
+async function removeTarget(phone,key,idx){
+  if(!confirm('Remove this target?'))return;
+  try{
+    const r=await fetch(`/api/accounts/${encodeURIComponent(phone)}/targets/${key}`,{method:'DELETE'});
+    const d=await r.json();
+    if(!r.ok){toast(d.error||'Unable to remove target','err');return}
+  }catch(err){
+    console.error(err);
+    toast('Network error','err');
+    return;
+  }
+  document.getElementById(`tpill-${idx}-${key}`)?.remove();
+  checkEmpty(phone);
+  toast('Target removed','inf');
+  fetchStats();
+}
+async function removeTargetEl(phone,key,btn){
+  if(!confirm('Remove this target?'))return;
+  try{
+    const r=await fetch(`/api/accounts/${encodeURIComponent(phone)}/targets/${key}`,{method:'DELETE'});
+    const d=await r.json();
+    if(!r.ok){toast(d.error||'Unable to remove target','err');return}
+  }catch(err){
+    console.error(err);
+    toast('Network error','err');
+    return;
+  }
+  const p=btn.closest('.ct-pill');
+  const ct=p?.parentElement;
+  p?.remove();
+  if(ct&&!ct.querySelector('.ct-pill')){
+    const e=document.createElement('span');e.className='ct-empty';
+    e.textContent='No targets — click ＋';
+    ct.appendChild(e);
+  }
+  toast('Target removed','inf');
+  fetchStats();
+}
 function checkEmpty(phone){const card=document.querySelector(`[data-phone="${phone}"]`);if(!card)return;const ct=card.querySelector('.ct-pills');if(ct&&!ct.querySelector('.ct-pill')&&!ct.querySelector('.ct-empty')){const e=document.createElement('span');e.className='ct-empty';e.textContent='No targets — click ＋';ct.appendChild(e)}}
 
 // ── Bot Controls ──────────────────────────────────

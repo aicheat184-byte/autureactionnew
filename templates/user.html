@@ -23,7 +23,7 @@
   --text:#f8fafc;--muted:#94a3b8;--input:rgba(255,255,255,.05);
 }
 html{scroll-behavior:smooth}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;perspective:1200px}
 
 /* BG */
 .bg-orbs{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
@@ -600,16 +600,19 @@ async function stopBot(){
 
 // ── Target Modal ─────────────────────────────────────────
 function openTgtModal(){
-  document.getElementById('tgtOverlay')?.classList.add('on');
-  document.getElementById('tInput')?.value='';
-  document.getElementById('tName')?.value='';
+  const tgtOverlay = document.getElementById('tgtOverlay');
+  if(tgtOverlay) tgtOverlay.classList.add('on');
+  const tInput = document.getElementById('tInput');
+  if(tInput) tInput.value='';
+  const tName = document.getElementById('tName');
+  if(tName) tName.value='';
   const topicSelect=document.getElementById('tTopic');
   if(topicSelect){topicSelect.innerHTML='<option value="">No topic selected</option>';topicSelect.disabled=true;}
   const hint=document.getElementById('tTopicHint');
   if(hint){hint.textContent='💡 If the group is a forum, topics will appear after resolving the chat.'}
-  setTimeout(()=>document.getElementById('tInput')?.focus(),100);
+  setTimeout(()=>{const inp=document.getElementById('tInput'); if(inp) inp.focus();},100);
 }
-function closeTgtModal(){document.getElementById('tgtOverlay')?.classList.remove('on')}
+function closeTgtModal(){const overlay=document.getElementById('tgtOverlay'); if(overlay) overlay.classList.remove('on')}
 async function addTarget(){
   const input=document.getElementById('tInput').value.trim();
   const name=document.getElementById('tName').value.trim();
@@ -617,13 +620,14 @@ async function addTarget(){
   const topic_id=topicSelect?.value||null;
   const topic_title=topic_id?topicSelect.options[topicSelect.selectedIndex].text.trim():'';
   if(!input){toast('Enter Chat ID or link','err');return}
-  setBtn('bAddTgt',true,'Add Target');
+  setBtn('bAddTgt',true,'Adding...');
   try{
     const body={input,name};
     if(topic_id){body.topic_id=topic_id;body.topic_title=topic_title}
     const r=await fetch(`/api/accounts/${encodeURIComponent(MY_PHONE)}/targets`,{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
+    if(!r.ok){toast(d.error||'Unable to add target','err');return}
     if(d.error){toast(d.error,'err');return}
     const pills=document.getElementById('targetPills');
     document.getElementById('t-empty')?.remove();
@@ -635,12 +639,16 @@ async function addTarget(){
     const cnt=document.getElementById('targetCount');
     if(cnt)cnt.textContent=parseInt(cnt.textContent||'0')+1;
     closeTgtModal();toast(`✅ "${spanTitle}" added!`,'ok');
-  }catch{toast('Network error','err')}
+  }catch(err){console.error(err);toast('Network error','err')}
   finally{setBtn('bAddTgt',false,'Add Target')}
 }
 async function removeTarget(key){
   if(!confirm('Remove this target?'))return;
-  await fetch(`/api/accounts/${encodeURIComponent(MY_PHONE)}/targets/${key}`,{method:'DELETE'});
+  try{
+    const r=await fetch(`/api/accounts/${encodeURIComponent(MY_PHONE)}/targets/${key}`,{method:'DELETE'});
+    const d=await r.json();
+    if(!r.ok){toast(d.error||'Unable to remove target','err');return}
+  }catch(err){console.error(err);toast('Network error','err');return}
   const pill=document.getElementById(`tp-${key}`);
   const pills=pill?.parentElement;pill?.remove();
   if(pills&&!pills.querySelector('.tpill')){
@@ -681,7 +689,7 @@ async function resolveTargetTopics(){
     });
 }
 
-function setEmoji(e){
+async function setEmoji(e){
   if(!MY_PHONE){toast('No account linked','err');return}
   try{
     const r=await fetch(`/api/accounts/${encodeURIComponent(MY_PHONE)}/emoji`,{
