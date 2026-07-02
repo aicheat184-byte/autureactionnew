@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#6d28d9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AutoReact">
+<meta name="description" content="AutoReact — Login to your Bot Dashboard">
 <link rel="manifest" href="/static/manifest.json">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,141 +15,217 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#030711;--purple:#8b5cf6;--purple2:#6d28d9;
+  --bg:#020510;--purple:#8b5cf6;--purple2:#6d28d9;--purple3:#4c1d95;
   --cyan:#22d3ee;--gold:#f59e0b;--green:#10b981;--red:#f43f5e;
-  --text:#f8fafc;--muted:#94a3b8;--border:rgba(99,102,241,.2);
+  --text:#f8fafc;--muted:#94a3b8;--border:rgba(99,102,241,.22);
   --input:rgba(255,255,255,.05);
 }
-html,body{height:100%}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
-  display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-
-/* BG */
-.orbs{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
-.orb{position:absolute;border-radius:50%;filter:blur(90px);animation:drift 20s ease-in-out infinite alternate}
-.o1{width:550px;height:550px;background:rgba(109,40,217,.14);top:-200px;left:-150px}
-.o2{width:450px;height:450px;background:rgba(6,182,212,.09);bottom:-200px;right:-150px;animation-delay:-10s}
-.o3{width:300px;height:300px;background:rgba(245,158,11,.07);top:40%;left:40%;animation-delay:-5s}
-@keyframes drift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,30px) scale(1.1)}}
-
-/* CARD */
-.card{
-  position:relative;z-index:1;
-  width:min(420px,100%);
-  background:rgba(8,12,32,.95);
-  border:1px solid rgba(139,92,246,.3);
-  border-radius:24px;padding:40px 36px;
-  box-shadow:0 32px 80px rgba(0,0,0,.6),
-             0 0 0 1px rgba(139,92,246,.1),
-             inset 0 1px 0 rgba(255,255,255,.04);
-  animation:up .5s cubic-bezier(.34,1.4,.64,1);
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
+  display:flex;align-items:center;justify-content:center;min-height:100vh;
+  perspective:1200px;
 }
-@keyframes up{from{transform:translateY(40px) scale(.95);opacity:0}to{transform:none;opacity:1}}
 
-/* LOGO */
-.logo{text-align:center;margin-bottom:32px}
+/* ── Particle Canvas ─────────────────────────────── */
+#canvas3d{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+/* ── Orbs ────────────────────────────────────────── */
+.orbs{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.orb{position:absolute;border-radius:50%;filter:blur(100px);animation:drift 24s ease-in-out infinite alternate}
+.o1{width:700px;height:700px;background:rgba(109,40,217,.16);top:-280px;left:-180px}
+.o2{width:600px;height:600px;background:rgba(6,182,212,.10);bottom:-220px;right:-180px;animation-delay:-12s}
+.o3{width:400px;height:400px;background:rgba(245,158,11,.07);top:35%;left:55%;animation-delay:-6s}
+.o4{width:300px;height:300px;background:rgba(16,185,129,.06);bottom:20%;left:10%;animation-delay:-18s}
+@keyframes drift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(50px,40px) scale(1.12)}}
+
+/* ── 3D Card Wrapper ─────────────────────────────── */
+.scene{position:relative;z-index:10;transform-style:preserve-3d;transition:transform .12s ease-out}
+
+/* ── Card ────────────────────────────────────────── */
+.card{
+  width:min(430px,92vw);
+  background:rgba(8,11,36,.92);
+  border-radius:28px;
+  padding:42px 38px;
+  box-shadow:
+    0 0 0 1px rgba(139,92,246,.18),
+    0 40px 100px rgba(0,0,0,.7),
+    0 0 60px rgba(109,40,217,.08),
+    inset 0 1px 0 rgba(255,255,255,.05);
+  position:relative;overflow:hidden;
+  animation:cardUp .6s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes cardUp{from{transform:translateY(60px) scale(.9);opacity:0}to{transform:none;opacity:1}}
+
+/* Animated gradient border */
+.card::before{
+  content:'';position:absolute;inset:-1px;border-radius:29px;
+  background:conic-gradient(from var(--angle,0deg),
+    transparent 30%,
+    rgba(139,92,246,.7) 40%,
+    rgba(34,211,238,.6) 50%,
+    rgba(139,92,246,.7) 60%,
+    transparent 70%
+  );
+  animation:borderSpin 4s linear infinite;
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  padding:1px;
+  pointer-events:none;
+}
+@property --angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes borderSpin{to{--angle:360deg}}
+
+/* Inner glow */
+.card::after{
+  content:'';position:absolute;top:-40%;left:50%;transform:translateX(-50%);
+  width:70%;height:300px;
+  background:radial-gradient(ellipse,rgba(139,92,246,.12) 0%,transparent 70%);
+  pointer-events:none;
+}
+
+/* ── Logo ────────────────────────────────────────── */
+.logo{text-align:center;margin-bottom:34px}
+.logo-icon-wrap{
+  display:inline-block;margin-bottom:16px;
+  animation:logoSpin 6s ease-in-out infinite;
+  transform-style:preserve-3d;
+}
+@keyframes logoSpin{
+  0%,100%{transform:rotateY(0deg) rotateX(0deg)}
+  25%{transform:rotateY(15deg) rotateX(5deg)}
+  50%{transform:rotateY(0deg) rotateX(10deg)}
+  75%{transform:rotateY(-15deg) rotateX(5deg)}
+}
 .logo-icon{
-  width:64px;height:64px;border-radius:18px;
-  background:linear-gradient(135deg,var(--purple2),var(--purple));
+  width:72px;height:72px;border-radius:20px;
+  background:linear-gradient(135deg,var(--purple3),var(--purple),var(--cyan));
   display:inline-flex;align-items:center;justify-content:center;
-  font-size:1.8rem;margin-bottom:14px;
-  box-shadow:0 0 32px rgba(139,92,246,.5);
+  font-size:2rem;
+  box-shadow:
+    0 0 0 1px rgba(139,92,246,.3),
+    0 0 40px rgba(139,92,246,.5),
+    0 0 80px rgba(139,92,246,.2),
+    inset 0 1px 0 rgba(255,255,255,.15);
 }
 .logo-name{
-  font-family:'Outfit',sans-serif;font-size:1.7rem;font-weight:900;
-  background:linear-gradient(135deg,#c4b5fd,var(--cyan));
+  font-family:'Outfit',sans-serif;font-size:1.85rem;font-weight:900;
+  background:linear-gradient(135deg,#e0d4ff,var(--cyan));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  letter-spacing:-.02em;
+  letter-spacing:-.03em;
 }
-.logo-sub{font-size:.8rem;color:var(--muted);margin-top:4px;letter-spacing:.06em}
+.logo-sub{font-size:.75rem;color:var(--muted);margin-top:5px;letter-spacing:.12em;text-transform:uppercase}
 .dev-tag{
-  display:inline-flex;align-items:center;gap:5px;margin-top:10px;
-  padding:4px 12px;border-radius:999px;font-size:.72rem;font-weight:700;
-  background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.28);
-  color:var(--gold);letter-spacing:.06em;text-transform:uppercase;
+  display:inline-flex;align-items:center;gap:5px;margin-top:12px;
+  padding:4px 14px;border-radius:999px;font-size:.7rem;font-weight:700;
+  background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);
+  color:var(--gold);letter-spacing:.08em;text-transform:uppercase;
+  animation:glow-gold 3s ease-in-out infinite;
 }
+@keyframes glow-gold{0%,100%{box-shadow:0 0 0 rgba(245,158,11,0)}50%{box-shadow:0 0 16px rgba(245,158,11,.3)}}
 
-/* FORM */
-.form-title{
-  font-family:'Outfit',sans-serif;font-size:1.15rem;font-weight:700;
-  margin-bottom:6px;
-}
-.form-sub{font-size:.83rem;color:var(--muted);margin-bottom:24px;line-height:1.5}
+/* ── Form ────────────────────────────────────────── */
+.form-title{font-family:'Outfit',sans-serif;font-size:1.2rem;font-weight:700;margin-bottom:6px}
+.form-sub{font-size:.83rem;color:var(--muted);margin-bottom:26px;line-height:1.6}
 
-.field{margin-bottom:16px}
-.field label{display:block;font-size:.8rem;font-weight:500;color:var(--muted);margin-bottom:6px}
+.field{margin-bottom:18px}
+.field label{display:block;font-size:.79rem;font-weight:600;color:var(--muted);margin-bottom:7px;letter-spacing:.02em}
 .field .input-wrap{position:relative}
 .field input{
-  width:100%;padding:12px 16px;
-  background:var(--input);border:1px solid var(--border);border-radius:11px;
+  width:100%;padding:13px 17px;
+  background:var(--input);
+  border:1px solid rgba(99,102,241,.2);
+  border-radius:13px;
   color:var(--text);font-family:'Inter',sans-serif;font-size:.93rem;outline:none;
-  transition:border-color .2s,background .2s;
+  transition:border-color .25s,background .25s,box-shadow .25s;
 }
-.field input:focus{border-color:rgba(139,92,246,.6);background:rgba(139,92,246,.07)}
-.field input::placeholder{color:rgba(148,163,184,.4)}
+.field input:focus{
+  border-color:rgba(139,92,246,.6);
+  background:rgba(139,92,246,.07);
+  box-shadow:0 0 0 3px rgba(139,92,246,.12),0 0 20px rgba(139,92,246,.08);
+}
+.field input::placeholder{color:rgba(148,163,184,.35)}
 .toggle-pass{
   position:absolute;right:13px;top:50%;transform:translateY(-50%);
-  background:none;border:none;color:var(--muted);cursor:pointer;font-size:.95rem;
-  transition:color .2s;
+  background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;
+  transition:color .2s;padding:4px;
 }
 .toggle-pass:hover{color:var(--text)}
 
 .btn-login{
-  width:100%;padding:13px;margin-top:8px;border-radius:12px;border:none;
-  background:linear-gradient(135deg,var(--purple2),var(--purple));
-  color:#fff;font-family:'Outfit',sans-serif;font-size:1rem;font-weight:700;
-  cursor:pointer;transition:all .25s;
-  box-shadow:0 6px 24px rgba(109,40,217,.38);
+  width:100%;padding:14px;margin-top:6px;border-radius:14px;border:none;
+  background:linear-gradient(135deg,var(--purple3),var(--purple),rgba(139,92,246,.8));
+  color:#fff;font-family:'Outfit',sans-serif;font-size:1rem;font-weight:800;
+  cursor:pointer;transition:all .3s;
+  box-shadow:0 6px 28px rgba(109,40,217,.42),0 0 0 1px rgba(139,92,246,.2);
   display:flex;align-items:center;justify-content:center;gap:8px;
+  position:relative;overflow:hidden;
+  letter-spacing:.02em;
 }
+.btn-login::before{
+  content:'';position:absolute;top:-50%;left:-60%;width:40%;height:200%;
+  background:linear-gradient(105deg,transparent,rgba(255,255,255,.15),transparent);
+  animation:shimmer 3s linear infinite;
+}
+@keyframes shimmer{0%{left:-60%}100%{left:120%}}
 .btn-login:hover:not(:disabled){
-  box-shadow:0 8px 32px rgba(109,40,217,.58);transform:translateY(-1px);
+  box-shadow:0 10px 36px rgba(109,40,217,.62),0 0 0 1px rgba(139,92,246,.4);
+  transform:translateY(-2px);
 }
+.btn-login:active:not(:disabled){transform:translateY(0)}
 .btn-login:disabled{opacity:.45;cursor:not-allowed;transform:none}
 
-/* ERROR */
+/* ── Error ───────────────────────────────────────── */
 .err-box{
-  padding:10px 14px;border-radius:10px;margin-bottom:16px;
-  background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.3);
+  padding:11px 15px;border-radius:11px;margin-bottom:18px;
+  background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);
   color:#f43f5e;font-size:.83rem;display:none;
-  animation:shake .3s ease;
+  animation:shake .35s ease;
 }
 .err-box.show{display:block}
-@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
 
-/* SPINNER */
+/* ── Spinner ─────────────────────────────────────── */
 .spin{display:inline-block;width:16px;height:16px;
   border:2px solid rgba(255,255,255,.3);border-top-color:#fff;
   border-radius:50%;animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 
-/* FOOTER */
-.footer{text-align:center;margin-top:24px;font-size:.75rem;color:rgba(148,163,184,.5)}
-.footer a{color:rgba(139,92,246,.7);text-decoration:none}
+/* ── Footer ──────────────────────────────────────── */
+.footer{text-align:center;margin-top:26px;font-size:.76rem;color:rgba(148,163,184,.55)}
+.footer a{color:rgba(139,92,246,.8);text-decoration:none;font-weight:500;transition:color .2s}
 .footer a:hover{color:var(--purple)}
+
+/* ── Divider ─────────────────────────────────────── */
+.divider{display:flex;align-items:center;gap:10px;margin:20px 0}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(99,102,241,.15)}
+.divider span{font-size:.7rem;color:var(--muted);letter-spacing:.06em}
 </style>
 </head>
 <body>
+<canvas id="canvas3d"></canvas>
 <div class="orbs">
-  <div class="orb o1"></div>
-  <div class="orb o2"></div>
-  <div class="orb o3"></div>
+  <div class="orb o1"></div><div class="orb o2"></div>
+  <div class="orb o3"></div><div class="orb o4"></div>
 </div>
 
+<div class="scene" id="scene">
 <div class="card">
   <!-- Logo -->
   <div class="logo">
-    <div class="logo-icon">🤖</div>
+    <div class="logo-icon-wrap"><div class="logo-icon">🤖</div></div>
     <div class="logo-name">AutoReact</div>
-    <div class="logo-sub">BOT DASHBOARD</div>
-    <div class="dev-tag">⚡ DEVELOPED BY CHEATZ</div>
+    <div class="logo-sub">Bot Dashboard</div>
+    <div class="dev-tag">⚡ Developed by CHEATZ</div>
   </div>
 
   <!-- Error -->
   <div class="err-box" id="errBox"></div>
 
   <!-- Form -->
-  <div class="form-title">Welcome back</div>
+  <div class="form-title">Welcome back 👋</div>
   <div class="form-sub">Sign in to manage your Telegram bots.</div>
 
   <div class="field">
@@ -165,7 +242,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
   </div>
 
   <button class="btn-login" id="btnLogin" onclick="doLogin()">
-    Sign In
+    🔐 Sign In
   </button>
 
   <div class="footer">
@@ -174,8 +251,78 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
     <a href="https://t.me/User_88881" target="_blank">Contact @User_88881</a>
   </div>
 </div>
+</div>
 
 <script>
+/* ── Particle Canvas ─────────────────────────── */
+(function(){
+  const canvas=document.getElementById('canvas3d');
+  const ctx=canvas.getContext('2d');
+  let W,H,particles=[];
+
+  function resize(){
+    W=canvas.width=window.innerWidth;
+    H=canvas.height=window.innerHeight;
+  }
+  resize();window.addEventListener('resize',resize);
+
+  function Particle(){
+    this.x=Math.random()*W;
+    this.y=Math.random()*H;
+    this.r=Math.random()*1.5+0.3;
+    this.vx=(Math.random()-.5)*.35;
+    this.vy=(Math.random()-.5)*.35;
+    this.a=Math.random();
+    this.colors=['rgba(139,92,246,','rgba(34,211,238,','rgba(109,40,217,'];
+    this.c=this.colors[Math.floor(Math.random()*this.colors.length)];
+  }
+  for(let i=0;i<130;i++) particles.push(new Particle());
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    particles.forEach(p=>{
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0)p.x=W;if(p.x>W)p.x=0;
+      if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=p.c+p.a+')';
+      ctx.fill();
+    });
+    // Lines between nearby particles
+    for(let i=0;i<particles.length;i++){
+      for(let j=i+1;j<particles.length;j++){
+        const dx=particles[i].x-particles[j].x;
+        const dy=particles[i].y-particles[j].y;
+        const d=Math.sqrt(dx*dx+dy*dy);
+        if(d<100){
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x,particles[i].y);
+          ctx.lineTo(particles[j].x,particles[j].y);
+          ctx.strokeStyle='rgba(139,92,246,'+(0.06*(1-d/100))+')';
+          ctx.lineWidth=.5;
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ── 3D Card Tilt ────────────────────────────── */
+const scene=document.getElementById('scene');
+document.addEventListener('mousemove',e=>{
+  const cx=window.innerWidth/2,cy=window.innerHeight/2;
+  const rx=((e.clientY-cy)/cy)*-8;
+  const ry=((e.clientX-cx)/cx)*8;
+  scene.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg)`;
+});
+document.addEventListener('mouseleave',()=>{
+  scene.style.transform='rotateX(0) rotateY(0)';
+});
+
+/* ── Login Logic ─────────────────────────────── */
 function togglePass(){
   const inp=document.getElementById('iPass');
   const btn=document.getElementById('eyeBtn');
@@ -205,7 +352,7 @@ async function doLogin(){
   }catch{
     showErr('Network error. Try again.');
   }finally{
-    btn.disabled=false;btn.innerHTML='Sign In';
+    btn.disabled=false;btn.innerHTML='🔐 Sign In';
   }
 }
 document.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});

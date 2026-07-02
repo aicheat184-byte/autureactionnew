@@ -12,108 +12,124 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#030711;--purple:#8b5cf6;--purple2:#6d28d9;
+  --bg:#020510;--purple:#8b5cf6;--purple2:#6d28d9;--purple3:#4c1d95;
   --cyan:#22d3ee;--gold:#f59e0b;--green:#10b981;--red:#f43f5e;
-  --text:#f8fafc;--muted:#94a3b8;--border:rgba(99,102,241,.2);
+  --text:#f8fafc;--muted:#94a3b8;--border:rgba(99,102,241,.22);
   --input:rgba(255,255,255,.05);
 }
 html,body{min-height:100%}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
-  display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-
-/* BG */
-.orbs{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
-.orb{position:absolute;border-radius:50%;filter:blur(90px);animation:drift 22s ease-in-out infinite alternate}
-.o1{width:600px;height:600px;background:rgba(109,40,217,.12);top:-200px;right:-100px}
-.o2{width:500px;height:500px;background:rgba(6,182,212,.09);bottom:-200px;left:-100px;animation-delay:-11s}
-.o3{width:300px;height:300px;background:rgba(16,185,129,.06);top:30%;left:60%;animation-delay:-5s}
-@keyframes drift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,30px) scale(1.1)}}
-
-/* CARD */
-.card{
-  position:relative;z-index:1;
-  width:min(480px,100%);
-  background:rgba(8,12,32,.96);
-  border:1px solid rgba(139,92,246,.28);
-  border-radius:24px;padding:36px;
-  box-shadow:0 32px 80px rgba(0,0,0,.6),
-             0 0 0 1px rgba(139,92,246,.1),
-             inset 0 1px 0 rgba(255,255,255,.04);
-  animation:up .45s cubic-bezier(.34,1.4,.64,1);
+body{
+  font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
+  display:flex;align-items:center;justify-content:center;min-height:100vh;
+  padding:24px;perspective:1200px;
 }
-@keyframes up{from{transform:translateY(36px) scale(.95);opacity:0}to{transform:none;opacity:1}}
 
-/* LOGO */
+#canvas3d{position:fixed;inset:0;z-index:0;pointer-events:none}
+.orbs{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.orb{position:absolute;border-radius:50%;filter:blur(100px);animation:drift 26s ease-in-out infinite alternate}
+.o1{width:700px;height:700px;background:rgba(109,40,217,.14);top:-250px;right:-120px}
+.o2{width:600px;height:600px;background:rgba(6,182,212,.09);bottom:-220px;left:-120px;animation-delay:-13s}
+.o3{width:350px;height:350px;background:rgba(16,185,129,.06);top:25%;left:60%;animation-delay:-6s}
+@keyframes drift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(50px,40px) scale(1.12)}}
+
+.scene{position:relative;z-index:10;transform-style:preserve-3d;transition:transform .12s ease-out}
+
+.card{
+  width:min(490px,94vw);
+  background:rgba(8,11,36,.92);
+  border-radius:28px;padding:38px;
+  box-shadow:
+    0 0 0 1px rgba(139,92,246,.18),
+    0 40px 100px rgba(0,0,0,.7),
+    inset 0 1px 0 rgba(255,255,255,.05);
+  position:relative;overflow:hidden;
+  animation:cardUp .6s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes cardUp{from{transform:translateY(60px) scale(.9);opacity:0}to{transform:none;opacity:1}}
+.card::before{
+  content:'';position:absolute;inset:-1px;border-radius:29px;
+  background:conic-gradient(from var(--angle,0deg),
+    transparent 30%,rgba(139,92,246,.6) 40%,rgba(34,211,238,.5) 50%,rgba(139,92,246,.6) 60%,transparent 70%);
+  animation:borderSpin 5s linear infinite;
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;padding:1px;pointer-events:none;
+}
+@property --angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes borderSpin{to{--angle:360deg}}
+
 .logo{text-align:center;margin-bottom:28px}
-.logo-icon{width:56px;height:56px;border-radius:16px;
-  background:linear-gradient(135deg,var(--purple2),var(--purple));
-  display:inline-flex;align-items:center;justify-content:center;
-  font-size:1.6rem;margin-bottom:12px;
-  box-shadow:0 0 28px rgba(139,92,246,.5)}
-.logo-name{font-family:'Outfit',sans-serif;font-size:1.5rem;font-weight:900;
-  background:linear-gradient(135deg,#c4b5fd,var(--cyan));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.logo-sub{font-size:.78rem;color:var(--muted);margin-top:3px}
+.logo-icon-wrap{display:inline-block;margin-bottom:14px;animation:logoSpin 7s ease-in-out infinite;transform-style:preserve-3d}
+@keyframes logoSpin{0%,100%{transform:rotateY(0)}25%{transform:rotateY(12deg) rotateX(4deg)}75%{transform:rotateY(-12deg) rotateX(4deg)}}
+.logo-icon{width:64px;height:64px;border-radius:18px;
+  background:linear-gradient(135deg,var(--purple3),var(--purple),var(--cyan));
+  display:inline-flex;align-items:center;justify-content:center;font-size:1.8rem;
+  box-shadow:0 0 0 1px rgba(139,92,246,.3),0 0 36px rgba(139,92,246,.5),inset 0 1px 0 rgba(255,255,255,.15)}
+.logo-name{font-family:'Outfit',sans-serif;font-size:1.65rem;font-weight:900;
+  background:linear-gradient(135deg,#e0d4ff,var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.03em}
+.logo-sub{font-size:.73rem;color:var(--muted);margin-top:4px;letter-spacing:.1em;text-transform:uppercase}
 
-/* FORM */
-.form-title{font-family:'Outfit',sans-serif;font-size:1.1rem;font-weight:700;margin-bottom:5px}
-.form-sub{font-size:.82rem;color:var(--muted);margin-bottom:22px;line-height:1.5}
+.form-title{font-family:'Outfit',sans-serif;font-size:1.15rem;font-weight:700;margin-bottom:5px}
+.form-sub{font-size:.82rem;color:var(--muted);margin-bottom:22px;line-height:1.6}
 
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.field{margin-bottom:14px}
-.field label{display:block;font-size:.78rem;font-weight:500;color:var(--muted);margin-bottom:5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.field{margin-bottom:15px}
+.field label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:6px;letter-spacing:.02em}
 .field .iw{position:relative}
 .field input{
-  width:100%;padding:11px 15px;
-  background:var(--input);border:1px solid var(--border);border-radius:10px;
+  width:100%;padding:12px 16px;
+  background:var(--input);border:1px solid rgba(99,102,241,.2);border-radius:12px;
   color:var(--text);font-family:'Inter',sans-serif;font-size:.9rem;outline:none;
-  transition:border-color .2s,background .2s;
+  transition:border-color .25s,background .25s,box-shadow .25s;
 }
-.field input:focus{border-color:rgba(139,92,246,.55);background:rgba(139,92,246,.07)}
-.field input::placeholder{color:rgba(148,163,184,.4)}
+.field input:focus{
+  border-color:rgba(139,92,246,.58);background:rgba(139,92,246,.07);
+  box-shadow:0 0 0 3px rgba(139,92,246,.11);
+}
+.field input::placeholder{color:rgba(148,163,184,.35)}
 .field input.err{border-color:rgba(244,63,94,.5)}
-.field .hint{font-size:.72rem;color:var(--red);margin-top:4px;display:none}
+.field .hint{font-size:.71rem;color:var(--red);margin-top:4px;display:none}
 .field .hint.show{display:block}
 .toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);
-  background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem}
+  background:none;border:none;color:var(--muted);cursor:pointer;font-size:.95rem;transition:color .2s}
 .toggle:hover{color:var(--text)}
 
 /* Password strength */
 .pw-strength{margin-top:6px;height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden}
-.pw-bar{height:100%;border-radius:2px;width:0;transition:width .3s,background .3s}
-
-.divider-line{display:flex;align-items:center;gap:10px;margin:6px 0 18px}
-.divider-line::before,.divider-line::after{content:'';flex:1;height:1px;background:var(--border)}
-.divider-line span{font-size:.72rem;color:var(--muted)}
-
-.btn-reg{
-  width:100%;padding:12px;border-radius:11px;border:none;
-  background:linear-gradient(135deg,var(--purple2),var(--purple));
-  color:#fff;font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:700;
-  cursor:pointer;transition:all .25s;
-  box-shadow:0 5px 20px rgba(109,40,217,.35);
-  display:flex;align-items:center;justify-content:center;gap:7px;
-}
-.btn-reg:hover:not(:disabled){box-shadow:0 7px 28px rgba(109,40,217,.55);transform:translateY(-1px)}
-.btn-reg:disabled{opacity:.4;cursor:not-allowed;transform:none}
-
-/* Error / Success */
-.alert{padding:10px 14px;border-radius:10px;margin-bottom:16px;
-  font-size:.83rem;display:none;animation:shake .3s ease}
-.alert.show{display:block}
-.alert.err{background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.3);color:#f43f5e}
-.alert.ok{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#10b981}
-@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.pw-bar{height:100%;border-radius:2px;width:0;transition:width .35s,background .35s}
 
 /* Code field */
 .code-wrap{display:none}
 .code-wrap.show{display:block}
 
-.footer{text-align:center;margin-top:20px;font-size:.78rem;color:rgba(148,163,184,.6)}
-.footer a{color:var(--purple);text-decoration:none;font-weight:500}
-.footer a:hover{text-decoration:underline}
+.btn-reg{
+  width:100%;padding:13px;border-radius:14px;border:none;
+  background:linear-gradient(135deg,var(--purple3),var(--purple),rgba(139,92,246,.8));
+  color:#fff;font-family:'Outfit',sans-serif;font-size:.97rem;font-weight:800;
+  cursor:pointer;transition:all .3s;
+  box-shadow:0 6px 28px rgba(109,40,217,.42),0 0 0 1px rgba(139,92,246,.2);
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  position:relative;overflow:hidden;letter-spacing:.02em;
+}
+.btn-reg::before{
+  content:'';position:absolute;top:-50%;left:-60%;width:40%;height:200%;
+  background:linear-gradient(105deg,transparent,rgba(255,255,255,.14),transparent);
+  animation:shimmer 3s linear infinite;
+}
+@keyframes shimmer{0%{left:-60%}100%{left:120%}}
+.btn-reg:hover:not(:disabled){box-shadow:0 10px 36px rgba(109,40,217,.6);transform:translateY(-2px)}
+.btn-reg:disabled{opacity:.4;cursor:not-allowed;transform:none}
 
-/* SPINNER */
+.alert{padding:11px 15px;border-radius:11px;margin-bottom:16px;font-size:.83rem;display:none;animation:shake .35s ease}
+.alert.show{display:block}
+.alert.err{background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);color:#f43f5e}
+.alert.ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#10b981}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+
+.footer{text-align:center;margin-top:22px;font-size:.76rem;color:rgba(148,163,184,.55)}
+.footer a{color:rgba(139,92,246,.8);text-decoration:none;font-weight:500}
+.footer a:hover{color:var(--purple)}
+
 .spin{display:inline-block;width:15px;height:15px;
   border:2px solid rgba(255,255,255,.3);border-top-color:#fff;
   border-radius:50%;animation:sp .7s linear infinite}
@@ -121,11 +137,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
 </style>
 </head>
 <body>
+<canvas id="canvas3d"></canvas>
 <div class="orbs"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
 
+<div class="scene" id="scene">
 <div class="card">
   <div class="logo">
-    <div class="logo-icon">🤖</div>
+    <div class="logo-icon-wrap"><div class="logo-icon">🤖</div></div>
     <div class="logo-name">AutoReact</div>
     <div class="logo-sub">Create your account</div>
   </div>
@@ -133,8 +151,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
   <div class="alert err" id="errAlert"></div>
   <div class="alert ok" id="okAlert"></div>
 
-  <div class="form-title">Create Account</div>
-  <div class="form-sub">Register to manage your Telegram bot.</div>
+  <div class="form-title">Create Account ✨</div>
+  <div class="form-sub">Register to manage your Telegram bots.</div>
 
   <div class="grid2">
     <div class="field">
@@ -167,7 +185,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
     <div class="hint" id="hConf"></div>
   </div>
 
-  <!-- Registration Code (shown only if server requires it) -->
   <div class="code-wrap" id="codeWrap">
     <div class="field">
       <label>🔑 Registration Code</label>
@@ -176,115 +193,84 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
   </div>
 
   <button class="btn-reg" id="btnReg" onclick="doRegister()">
-    Create Account
+    🚀 Create Account
   </button>
 
   <div class="footer">
     Already have an account? <a href="/login">Sign In</a>
   </div>
 </div>
+</div>
 
 <script>
-// Check if registration code is required
-const requireCode = {{ 'true' if require_code else 'false' }};
-if (requireCode) document.getElementById('codeWrap').classList.add('show');
-
-function toggleVis(id, btn) {
-  const inp = document.getElementById(id);
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
-}
-
-function clearErr(id) {
-  const inp = document.getElementById(id);
-  inp.classList.remove('err');
-}
-
-function showFieldErr(id, hintId, msg) {
-  document.getElementById(id).classList.add('err');
-  const h = document.getElementById(hintId);
-  if(h){ h.textContent = msg; h.classList.add('show'); }
-}
-
-function showAlert(type, msg) {
-  const e = document.getElementById('errAlert');
-  const o = document.getElementById('okAlert');
-  e.classList.remove('show'); o.classList.remove('show');
-  if(type==='err'){ e.textContent=msg; e.classList.add('show'); }
-  else { o.textContent=msg; o.classList.add('show'); }
-}
-
-function checkPwStrength() {
-  const pw = document.getElementById('rPass').value;
-  const bar = document.getElementById('pwBar');
-  let score = 0;
-  if (pw.length >= 6) score++;
-  if (pw.length >= 10) score++;
-  if (/[A-Z]/.test(pw)) score++;
-  if (/[0-9]/.test(pw)) score++;
-  if (/[^a-zA-Z0-9]/.test(pw)) score++;
-  const pct = (score / 5) * 100;
-  const colors = ['#f43f5e','#f59e0b','#f59e0b','#10b981','#10b981'];
-  bar.style.width = pct + '%';
-  bar.style.background = colors[Math.max(0,score-1)] || '#f43f5e';
-}
-
-async function doRegister() {
-  // Clear previous hints
-  ['hUser','hPass','hConf'].forEach(h => {
-    const el = document.getElementById(h);
-    if(el){ el.classList.remove('show'); el.textContent=''; }
-  });
-  ['rUser','rPass','rConf'].forEach(id => document.getElementById(id)?.classList.remove('err'));
-
-  const username = document.getElementById('rUser').value.trim();
-  const display_name = document.getElementById('rName').value.trim();
-  const password = document.getElementById('rPass').value;
-  const confirm = document.getElementById('rConf').value;
-  const code = document.getElementById('rCode')?.value.trim() || '';
-
-  // Validate
-  let hasErr = false;
-  if (!username || username.length < 3) {
-    showFieldErr('rUser','hUser','Min 3 characters'); hasErr=true;
+/* Particle canvas */
+(function(){
+  const canvas=document.getElementById('canvas3d');
+  const ctx=canvas.getContext('2d');
+  let W,H,pts=[];
+  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight}
+  resize();window.addEventListener('resize',resize);
+  function P(){this.x=Math.random()*W;this.y=Math.random()*H;this.r=Math.random()*1.4+.3;this.vx=(Math.random()-.5)*.3;this.vy=(Math.random()-.5)*.3;this.a=Math.random();this.c=['rgba(139,92,246,','rgba(34,211,238,','rgba(109,40,217,'][Math.floor(Math.random()*3)]}
+  for(let i=0;i<110;i++)pts.push(new P());
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    pts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle=p.c+p.a+')';ctx.fill()});
+    for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);if(d<90){ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.strokeStyle='rgba(139,92,246,'+(0.05*(1-d/90))+')';ctx.lineWidth=.5;ctx.stroke()}}
+    requestAnimationFrame(draw);
   }
-  if (!password || password.length < 6) {
-    showFieldErr('rPass','hPass','Min 6 characters'); hasErr=true;
-  }
-  if (password !== confirm) {
-    showFieldErr('rConf','hConf','Passwords do not match'); hasErr=true;
-  }
-  if (hasErr) return;
+  draw();
+})();
 
-  const btn = document.getElementById('btnReg');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span> Creating…';
+const scene=document.getElementById('scene');
+document.addEventListener('mousemove',e=>{
+  const cx=innerWidth/2,cy=innerHeight/2;
+  scene.style.transform=`rotateX(${((e.clientY-cy)/cy)*-6}deg) rotateY(${((e.clientX-cx)/cx)*6}deg)`;
+});
+document.addEventListener('mouseleave',()=>{scene.style.transform='rotateX(0) rotateY(0)'});
 
-  try {
-    const r = await fetch('/api/register', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({username, display_name: display_name||username, password, confirm, code})
-    });
-    const d = await r.json();
-    if (d.error) { showAlert('err', d.error); return; }
-    showAlert('ok', `✅ Account created! Redirecting to login…`);
-    setTimeout(() => window.location.href = '/login', 1800);
-  } catch {
-    showAlert('err', 'Network error. Please try again.');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = 'Create Account';
-  }
+const requireCode={{- 'true' if require_code else 'false' -}};
+if(requireCode) document.getElementById('codeWrap').classList.add('show');
+
+function toggleVis(id,btn){const inp=document.getElementById(id);inp.type=inp.type==='password'?'text':'password';btn.textContent=inp.type==='password'?'👁':'🙈'}
+function clearErr(id){document.getElementById(id).classList.remove('err')}
+function showFieldErr(id,hintId,msg){document.getElementById(id).classList.add('err');const h=document.getElementById(hintId);if(h){h.textContent=msg;h.classList.add('show')}}
+function showAlert(type,msg){
+  const e=document.getElementById('errAlert'),o=document.getElementById('okAlert');
+  e.classList.remove('show');o.classList.remove('show');
+  if(type==='err'){e.textContent=msg;e.classList.add('show')}
+  else{o.textContent=msg;o.classList.add('show')}
 }
-
-// Enter key support
-document.addEventListener('keydown', e => { if(e.key==='Enter') doRegister(); });
-
-// PWA sw register
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+function checkPwStrength(){
+  const pw=document.getElementById('rPass').value,bar=document.getElementById('pwBar');
+  let s=0;if(pw.length>=6)s++;if(pw.length>=10)s++;if(/[A-Z]/.test(pw))s++;if(/[0-9]/.test(pw))s++;if(/[^a-zA-Z0-9]/.test(pw))s++;
+  bar.style.width=(s/5*100)+'%';bar.style.background=['#f43f5e','#f59e0b','#f59e0b','#10b981','#10b981'][Math.max(0,s-1)]||'#f43f5e';
 }
+async function doRegister(){
+  ['hUser','hPass','hConf'].forEach(h=>{const el=document.getElementById(h);if(el){el.classList.remove('show');el.textContent=''}});
+  ['rUser','rPass','rConf'].forEach(id=>document.getElementById(id)?.classList.remove('err'));
+  const username=document.getElementById('rUser').value.trim();
+  const display_name=document.getElementById('rName').value.trim();
+  const password=document.getElementById('rPass').value;
+  const confirm=document.getElementById('rConf').value;
+  const code=document.getElementById('rCode')?.value.trim()||'';
+  let hasErr=false;
+  if(!username||username.length<3){showFieldErr('rUser','hUser','Min 3 characters');hasErr=true}
+  if(!password||password.length<6){showFieldErr('rPass','hPass','Min 6 characters');hasErr=true}
+  if(password!==confirm){showFieldErr('rConf','hConf','Passwords do not match');hasErr=true}
+  if(hasErr)return;
+  const btn=document.getElementById('btnReg');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span> Creating…';
+  try{
+    const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,display_name:display_name||username,password,confirm,code})});
+    const d=await r.json();
+    if(d.error){showAlert('err',d.error);return}
+    showAlert('ok','✅ Account created! Redirecting to login…');
+    setTimeout(()=>window.location.href='/login',1800);
+  }catch{showAlert('err','Network error. Please try again.')}
+  finally{btn.disabled=false;btn.innerHTML='🚀 Create Account'}
+}
+document.addEventListener('keydown',e=>{if(e.key==='Enter')doRegister()});
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/static/sw.js').catch(()=>{})}
 </script>
 </body>
 </html>
