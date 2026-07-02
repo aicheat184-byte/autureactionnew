@@ -727,6 +727,14 @@ def resolve_target_api(phone):
         return jsonify({'error': 'Input required'}), 400
     try:
         resolved = _resolve_target_input(phone, input_val)
+        if resolved.get('id') is not None:
+            client, loop = _get_bot_client(phone)
+            if client:
+                try:
+                    topics = _fetch_forum_topics(client, loop, resolved['id'])
+                    resolved['topics'] = topics
+                except Exception:
+                    resolved['topics'] = []
         return jsonify(resolved)
     except Exception as e:
         return jsonify({'error': str(e)}), 400

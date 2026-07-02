@@ -759,16 +759,20 @@ function appendCard(d){
 }
 
 // ── Target Modal ──────────────────────────────────
-function openTargetModal(phone,accName){tgtPhone=phone;document.getElementById('tInput').value='';document.getElementById('tName').value='';document.getElementById('tgtAccLabel').textContent=`Adding target for: ${accName}`;document.getElementById('tgtOverlay').classList.add('on');setTimeout(()=>document.getElementById('tInput').focus(),100)}
+function openTargetModal(phone,accName){tgtPhone=phone;document.getElementById('tInput').value='';document.getElementById('tName').value='';document.getElementById('tgtAccLabel').textContent=`Adding target for: ${accName}`;const topicSelect=document.getElementById('tTopic');if(topicSelect){topicSelect.innerHTML='<option value="">No topic selected</option>';topicSelect.disabled=true;}const hint=document.getElementById('tTopicHint');if(hint){hint.textContent='💡 If the chat is a forum, topics will appear after resolving the chat.';}document.getElementById('tgtOverlay').classList.add('on');setTimeout(()=>document.getElementById('tInput').focus(),100)}
 function closeTgtModal(){document.getElementById('tgtOverlay').classList.remove('on')}
 async function addTarget(){
   const input=document.getElementById('tInput').value.trim(),name=document.getElementById('tName').value.trim();
+  const topicSelect=document.getElementById('tTopic');
+  const topic_id=topicSelect?.value||null;
+  const topic_title=topic_id?topicSelect.options[topicSelect.selectedIndex].text.trim():'';
   if(!input){toast('Enter Chat ID or link','err');return}
   setBtn('bAddTgt',true,'Add Target ＋');
-  try{const r=await fetch(`/api/accounts/${encodeURIComponent(tgtPhone)}/targets`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input,name})});const d=await r.json();if(d.error){toast(d.error,'err');return}
+  try{const body={input,name};if(topic_id){body.topic_id=topic_id;body.topic_title=topic_title};const r=await fetch(`/api/accounts/${encodeURIComponent(tgtPhone)}/targets`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(d.error){toast(d.error,'err');return}
     const card=document.querySelector(`[data-phone="${tgtPhone}"]`);
-    if(card){const pillsEl=card.querySelector('.ct-pills');if(pillsEl){pillsEl.querySelector('.ct-empty')?.remove();const p=document.createElement('span');p.className='ct-pill';p.id=`tpill-x-${d.key}`;p.innerHTML=`<span class="ct-pill-name" title="${d.id}">${d.name}</span><button class="ct-del" onclick="removeTargetEl('${tgtPhone}','${d.key}',this)">✕</button>`;pillsEl.appendChild(p)}}
-    closeTgtModal();toast(`✅ "${d.name}" added!`,'ok');fetchStats();
+    const label=d.topic_name?`${d.name} · ${d.topic_name}`:d.name;
+    if(card){const pillsEl=card.querySelector('.ct-pills');if(pillsEl){pillsEl.querySelector('.ct-empty')?.remove();const p=document.createElement('span');p.className='ct-pill';p.id=`tpill-x-${d.key}`;p.innerHTML=`<span class="ct-pill-name" title="${d.id}">${label}</span><button class="ct-del" onclick="removeTargetEl('${tgtPhone}','${d.key}',this)">✕</button>`;pillsEl.appendChild(p)}}
+    closeTgtModal();toast(`✅ "${label}" added!`,'ok');fetchStats();
   }catch{toast('Network error','err')}
   finally{setBtn('bAddTgt',false,'Add Target ＋')}
 }
@@ -784,36 +788,37 @@ async function resetCount(phone){const r=await fetch(`/api/accounts/${encodeURIC
 async function pingBot(phone){toast('Pinging…','inf');const r=await fetch(`/api/ping/${encodeURIComponent(phone)}`);const d=await r.json();toast(d.connected?`✅ ${phone} connected (${d.status})`:`❌ ${phone} not connected`,(d.connected?'ok':'err'),4000)}
 
 // ── Emoji ─────────────────────────────────────────
-async function setEmoji(e){
-  // Optimistic UI: mark as selected immediately
-  document.querySelectorAll('.emo').forEach(b=>b.classList.remove('sel'));
-  const clickedBtn=[...document.querySelectorAll('.emo')].find(b=>b.textContent===e);
-  if(clickedBtn){clickedBtn.classList.add('sel');clickedBtn.style.transform='scale(1.3)';setTimeout(()=>clickedBtn.style.transform='',250)}
-  try{
-    const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reaction:e})});
-    const d=await r.json();
-    if(d.error){toast(d.error,'err');return}
-    // Use confirmed value from server response
-    const confirmed=d.reaction||e;
-    document.getElementById('curEmo').textContent=confirmed;
-    // Re-sync selection buttons with confirmed server value
-    document.querySelectorAll('.emo').forEach(b=>b.classList.toggle('sel',b.textContent===confirmed));
-    toast(`✅ Reaction set → ${confirmed}`,'ok');
-  }catch{toast('Network error — emoji not saved','err')}
+async function resolveTargetTopics(){
+  const input=document.getElementById('tInput').value.trim();
+  const topicSelect=document.getElementById('tTopic');
+  const hint=document.getElementById('tTopicHint');
+  if(!input||!topicSelect){return}
+  topicSelect.disabled=true;
+  topicSelect.innerHTML='<option value="">Loading topics…</option>';
+  if(hint){hint.textContent='💡 Resolving topics…';}
+  fetch(`/api/accounts/${encodeURIComponent(tgtPhone)}/targets/resolve?input=${encodeURIComponent(input)}`)
+    .then(r=>r.json())
+    .then(d=>{
+      if(d.error||!d.topics?.length){
+        topicSelect.innerHTML='<option value="">No forum topics found</option>';
+        topicSelect.disabled=true;
+        if(hint){hint.textContent=d.error?`⚠️ ${d.error}`:'💡 No forum topics found for this chat.';}
+        return;
+      }
+      topicSelect.innerHTML='<option value="">No topic selected</option>' + d.topics.map(t=>`<option value="${t.id}">${t.title}</option>`).join('');
+      topicSelect.disabled=false;
+      if(hint){hint.textContent='💡 Select a topic to react only within that thread.';}
+    })
+    .catch(()=>{
+      topicSelect.innerHTML='<option value="">No topics found</option>';
+      topicSelect.disabled=true;
+      if(hint){hint.textContent='⚠️ Could not resolve topics';}
+    });
 }
-
-// ── User Management ───────────────────────────────
-async function openUserMgr(){document.getElementById('umOverlay').classList.add('on');await loadWebUsers()}
-function closeUserMgr(){document.getElementById('umOverlay').classList.remove('on')}
-async function loadWebUsers(){const r=await fetch('/api/users');if(r.status===403)return;const users=await r.json();const list=document.getElementById('umList');list.innerHTML='';for(const[u,d]of Object.entries(users)){const row=document.createElement('div');row.className='user-row';row.innerHTML=`<div class="ur-av">${(d.display_name||u)[0].toUpperCase()}</div><div class="ur-info"><div class="ur-name">${d.display_name||u} <span style="color:var(--muted);font-size:.7rem">(${u})</span></div>${d.phone?`<div class="ur-phone">${d.phone}</div>`:''}</div><span class="ur-role ${d.role}">${d.role.toUpperCase()}</span><button class="ur-del" onclick="delWebUser('${u}')">🗑</button>`;list.appendChild(row)}}
-async function delWebUser(u){if(!confirm(`Delete user "${u}"?`))return;const r=await fetch(`/api/users/${encodeURIComponent(u)}`,{method:'DELETE'});const d=await r.json();if(d.error){toast(d.error,'err');return}toast(`"${u}" deleted`,'ok');await loadWebUsers()}
-async function createWebUser(){const username=document.getElementById('nuUser').value.trim(),password=document.getElementById('nuPass').value.trim(),role=document.getElementById('nuRole').value,phone=document.getElementById('nuPhone').value.trim()||null;if(!username||!password){toast('Username & password required','err');return}setBtn('bCreateUser',true,'Add User ＋');try{const r=await fetch('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,role,phone,display_name:username})});const d=await r.json();if(d.error){toast(d.error,'err');return}toast(`"${username}" created!`,'ok');['nuUser','nuPass','nuPhone'].forEach(id=>document.getElementById(id).value='');await loadWebUsers()}catch{toast('Network error','err')}finally{setBtn('bCreateUser',false,'Add User ＋')}}
-
-// ── Keyboard shortcuts ────────────────────────────
-document.getElementById('iPhone').addEventListener('keydown',e=>{if(e.key==='Enter')sendCode()});
 document.getElementById('iOTP').addEventListener('keydown',e=>{if(e.key==='Enter')verifyOTP()});
 document.getElementById('i2FA').addEventListener('keydown',e=>{if(e.key==='Enter')verify2FA()});
-document.getElementById('tInput').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('tName').focus()});
+document.getElementById('tInput').addEventListener('keydown',e=>{if(e.key==='Enter'){document.getElementById('tName').focus();resolveTargetTopics()}});
+document.getElementById('tInput').addEventListener('blur',()=>resolveTargetTopics());
 document.getElementById('tName').addEventListener('keydown',e=>{if(e.key==='Enter')addTarget()});
 </script>
 </body>
