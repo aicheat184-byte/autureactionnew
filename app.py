@@ -83,18 +83,16 @@ def del_acc_target_db(phone, key):
     save_targets(t)
 
 def load_config():
+    cfg = {'reaction': DEFAULT_REACT}   # start with safe default
     if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            cfg = json.load(f)
-        # Migrate: if emoji_list has >1 item but reaction is set, honour reaction only
-        if 'reaction' not in cfg:
-            cfg['reaction'] = DEFAULT_REACT
-        # Ensure emoji_list always exists (may be empty = no rotation)
-        if 'emoji_list' not in cfg:
-            cfg['emoji_list'] = []
-        return cfg
-    cfg = {'reaction': DEFAULT_REACT, 'emoji_list': []}  # No rotation by default
-    save_config(cfg)
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                saved = json.load(f)
+            # Only read the reaction field — ignore emoji_list to prevent rotation
+            if saved.get('reaction'):
+                cfg['reaction'] = saved['reaction'].strip() or DEFAULT_REACT
+        except Exception:
+            pass
     return cfg
 
 def save_config(data):
@@ -127,42 +125,25 @@ def _in_schedule(acc_data):
 
 
 def _pick_emoji(phone, acc_data, chat_id=None, target_key=None):
-    """Pick emoji for this reaction — per-target override > per-account > global config."""
+    """
+    Return a SINGLE emoji for this reaction.
+    Priority: per-target override > per-account reaction > global config reaction.
+    Emoji rotation is intentionally REMOVED — always 1 emoji per reaction.
+    """
     # 1. Per-target emoji override
     if target_key:
-        targets = get_acc_targets(phone)
-        tgt = targets.get(target_key, {})
-        if tgt.get('emoji'):
-            return tgt['emoji']
+        tgt = get_acc_targets(phone).get(target_key, {})
+        if tgt.get('emoji', '').strip():
+            return tgt['emoji'].strip()
 
-    # 2. Per-account emoji list (rotation, only when >1 item)
-    emoji_list = acc_data.get('emoji_list') or []
-    if len(emoji_list) > 1:
-        idx = _emoji_idx.get(phone, 0)
-        emoji = emoji_list[idx % len(emoji_list)]
-        _emoji_idx[phone] = (idx + 1) % len(emoji_list)
-        return emoji
-    if len(emoji_list) == 1:
-        return emoji_list[0]  # Single per-account emoji — no rotation
-
-    # 3. Single per-account reaction override
+    # 2. Per-account reaction
     single = acc_data.get('reaction', '').strip()
     if single:
         return single
 
-    # 4. Global config — rotation only when list has >1 item
+    # 3. Global config reaction (only the `reaction` field — no list)
     cfg = load_config()
-    cfg_list = [e for e in (cfg.get('emoji_list') or []) if e.strip()]
-    if len(cfg_list) > 1:
-        idx = _emoji_idx.get('__global__', 0)
-        emoji = cfg_list[idx % len(cfg_list)]
-        _emoji_idx['__global__'] = (idx + 1) % len(cfg_list)
-        return emoji
-    if len(cfg_list) == 1:
-        return cfg_list[0]  # Single global emoji — no rotation
-
-    # 5. Absolute fallback
-    return cfg.get('reaction', DEFAULT_REACT)
+    return cfg.get('reaction', DEFAULT_REACT) or DEFAULT_REACT
 
 # ── User Management ────────────────────────────────────────
 def load_users():
@@ -652,25 +633,16 @@ def get_config():
 @login_required
 @admin_required
 def set_config():
-    data   = request.json
+    data = request.json
     config = load_config()
     if 'reaction' in data:
-        new_emoji = data['reaction'].strip()
-        config['reaction']   = new_emoji
-        # ── KEY FIX: setting a single emoji clears the rotation list ──
-        config['emoji_list'] = []          # empty = no rotation, use reaction field
-        _emoji_idx.pop('__global__', None) # reset rotation index
-    if 'emoji_list' in data:
-        elist = data['emoji_list']
-        if isinstance(elist, list):
-            clean = [e.strip() for e in elist if str(e).strip()]
-            config['emoji_list'] = clean
-            # If list is set to a single item, also update reaction field
-            if len(clean) == 1:
-                config['reaction'] = clean[0]
-            _emoji_idx.pop('__global__', None)  # reset rotation index
-    save_config(config)
-    return jsonify({'status': 'saved', **config})
+        new_emoji = str(data['reaction']).strip()
+        if new_emoji:
+            config['reaction'] = new_emoji
+    # Save ONLY reaction field — no emoji_list stored
+    save_config({'reaction': config['reaction']})
+    _emoji_idx.clear()   # clear all rotation counters (no-op now but safe)
+    return jsonify({'status': 'saved', 'reaction': config['reaction']})
 
 
 # ── Reset Reaction Count ───────────────────────────────────
@@ -758,25 +730,18 @@ def set_account_schedule(phone):
     return jsonify({'status': 'saved', 'schedule': accounts[phone]['schedule']})
 
 
-# ── Per-Account Emoji List (Rotation) ─────────────────────
+# ── Per-Account Emoji List (DISABLED — rotation removed) ──────────────────────
 @app.route('/api/accounts/<path:phone>/emoji-list', methods=['POST'])
 @login_required
 def set_account_emoji_list(phone):
-    if phone not in get_visible_accounts():
-        return jsonify({'error': 'No permission'}), 403
-    data = request.json or {}
-    elist = data.get('emoji_list', [])
-    if not isinstance(elist, list):
-        return jsonify({'error': 'emoji_list must be array'}), 400
-    elist = [e.strip() for e in elist if str(e).strip()]
+    """Rotation disabled. Clears any stale emoji_list from account and returns ok."""
     accounts = load_accounts()
-    if phone not in accounts:
-        return jsonify({'error': 'Account not found'}), 404
-    accounts[phone]['emoji_list'] = elist
-    # Reset rotation index
-    _emoji_idx.pop(phone, None)
-    save_accounts(accounts)
-    return jsonify({'status': 'saved', 'emoji_list': elist})
+    if phone in accounts and accounts[phone].get('emoji_list'):
+        accounts[phone].pop('emoji_list', None)
+        _emoji_idx.pop(phone, None)
+        save_accounts(accounts)
+    return jsonify({'status': 'rotation_disabled',
+                    'message': 'Use single emoji via /emoji endpoint'})
 
 
 # ── Per-Target Emoji Override ──────────────────────────────
@@ -793,12 +758,12 @@ def set_target_emoji(phone, key):
     if emoji:
         t[phone][key]['emoji'] = emoji
     else:
-        t[phone][key].pop('emoji', None)  # remove override
+        t[phone][key].pop('emoji', None)
     save_targets(t)
     return jsonify({'status': 'saved', 'emoji': emoji or None})
 
 
-# ── Per-Account Emoji ──────────────────────────────────────
+# ── Per-Account Emoji (single only) ───────────────────────
 @app.route('/api/accounts/<path:phone>/emoji', methods=['POST'])
 @login_required
 def set_account_emoji(phone):
@@ -812,6 +777,9 @@ def set_account_emoji(phone):
     if phone not in accounts:
         return jsonify({'error': 'Account not found'}), 404
     accounts[phone]['reaction'] = emoji
+    # Remove any stale emoji_list so rotation can never happen
+    accounts[phone].pop('emoji_list', None)
+    _emoji_idx.pop(phone, None)
     save_accounts(accounts)
     return jsonify({'status': 'saved', 'reaction': emoji})
 
@@ -1053,6 +1021,29 @@ def autostart():
             set_acc_target(phone, str(default_target),
                            {'id': default_target, 'name': 'Default Group'})
     load_config()
+    # ── Startup cleanup: remove stale emoji_list from all accounts ──
+    accounts = load_accounts()
+    changed = False
+    for phone in accounts:
+        if accounts[phone].pop('emoji_list', None) is not None:
+            changed = True
+            print(f"[Startup] Cleared stale emoji_list for {phone}")
+    if changed:
+        save_accounts(accounts)
+    # ── Also clean config.json if it has emoji_list ──
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                cfg_raw = json.load(f)
+            if 'emoji_list' in cfg_raw:
+                cfg_raw.pop('emoji_list')
+                with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(cfg_raw, f, indent=2, ensure_ascii=False)
+                print("[Startup] Cleared stale emoji_list from config.json")
+        except Exception:
+            pass
+    # ── Start all bots ──
+    accounts = load_accounts()
     for phone, data in accounts.items():
         ss = data.get('session_string')
         if ss:
