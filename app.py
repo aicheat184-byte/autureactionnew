@@ -6,7 +6,7 @@ import csv
 import io
 from datetime import datetime, time as dtime
 from functools import wraps
-from flask import Flask, render_template, request, jsonify, session, redirect, Response
+from flask import Flask, render_template, request, jsonify, session, redirect, Response, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -31,6 +31,8 @@ ACCOUNTS_FILE = 'accounts.json'
 TARGETS_FILE  = 'targets.json'
 CONFIG_FILE   = 'config.json'
 USERS_FILE    = 'users.json'
+AVATAR_DIR    = os.path.join('static', 'avatars')
+os.makedirs(AVATAR_DIR, exist_ok=True)
 PORT          = int(os.environ.get('PORT', 5000))
 CONTACT       = 'https://t.me/User_88881'
 REGISTER_CODE = os.environ.get('REGISTER_CODE', '')  # empty = open registration
@@ -848,6 +850,63 @@ def change_password(username):
     users[username]['password'] = generate_password_hash(new_pass)
     save_users(users)
     return jsonify({'status': 'updated'})
+
+
+# ── Profile Picture ────────────────────────────────────────
+ALLOWED_EXT = {'jpg', 'jpeg', 'png', 'webp', 'gif'}
+MIME_MAP    = {'jpg':'image/jpeg','jpeg':'image/jpeg','png':'image/png','webp':'image/webp','gif':'image/gif'}
+
+@app.route('/api/profile/avatar/<username>', methods=['GET'])
+def get_avatar(username):
+    """Serve profile picture; returns 404 if none uploaded."""
+    for ext in ALLOWED_EXT:
+        path = os.path.join(AVATAR_DIR, f'{username}.{ext}')
+        if os.path.exists(path):
+            return send_file(path, mimetype=MIME_MAP.get(ext, 'image/jpeg'))
+    return jsonify({'error': 'No avatar'}), 404
+
+@app.route('/api/profile/avatar', methods=['POST'])
+@login_required
+def upload_avatar():
+    """Upload profile picture for the currently logged-in user."""
+    username = session.get('username')
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+    f = request.files['file']
+    if not f.filename:
+        return jsonify({'error': 'Empty filename'}), 400
+    ext = f.filename.rsplit('.', 1)[-1].lower()
+    if ext not in ALLOWED_EXT:
+        return jsonify({'error': 'Unsupported file type (jpg/png/webp/gif only)'}), 400
+    # Remove old avatar files for this user
+    for old_ext in ALLOWED_EXT:
+        old = os.path.join(AVATAR_DIR, f'{username}.{old_ext}')
+        if os.path.exists(old):
+            os.remove(old)
+    save_path = os.path.join(AVATAR_DIR, f'{username}.{ext}')
+    f.save(save_path)
+    users = load_users()
+    if username in users:
+        users[username]['avatar_ext'] = ext
+        save_users(users)
+    return jsonify({'status': 'uploaded', 'url': f'/api/profile/avatar/{username}'})
+
+@app.route('/api/profile/avatar', methods=['DELETE'])
+@login_required
+def delete_avatar():
+    """Remove profile picture for the currently logged-in user."""
+    username = session.get('username')
+    removed = False
+    for ext in ALLOWED_EXT:
+        path = os.path.join(AVATAR_DIR, f'{username}.{ext}')
+        if os.path.exists(path):
+            os.remove(path)
+            removed = True
+    users = load_users()
+    if username in users:
+        users[username].pop('avatar_ext', None)
+        save_users(users)
+    return jsonify({'status': 'removed' if removed else 'no_avatar'})
 
 
 # ── Login Flow (any logged-in user can connect Telegram) ───

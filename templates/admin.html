@@ -62,11 +62,18 @@ header{
 .btn-export:hover{background:rgba(16,185,129,.22)}
 .btn-logout{background:rgba(244,63,94,.07);border-color:rgba(244,63,94,.18);color:var(--red)}
 .btn-logout:hover{background:rgba(244,63,94,.18)}
-.u-chip{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
+.u-chip{display:flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;border-radius:999px;
   background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.22)}
-.u-av{width:22px;height:22px;border-radius:50%;
+.u-av{
+  width:30px;height:30px;border-radius:50%;
   background:linear-gradient(135deg,var(--purple2),var(--purple));
-  display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;color:#fff}
+  display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;color:#fff;
+  overflow:hidden;cursor:pointer;transition:all .25s;flex-shrink:0;
+  border:2px solid rgba(139,92,246,.4);position:relative;
+}
+.u-av:hover{border-color:var(--purple);box-shadow:0 0 14px rgba(139,92,246,.6)}
+.u-av img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.u-av .av-init{line-height:1;font-size:.75rem;font-weight:800}
 .u-name{font-size:.76rem;font-weight:600;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ── MAIN ─────────────────────────────────────────── */
@@ -346,7 +353,10 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
     <button class="hdr-btn btn-users" onclick="openUserMgr()">👥 Users</button>
     <a class="hdr-btn btn-export" href="/api/activity/export" download>📥 CSV</a>
     <div class="u-chip">
-      <div class="u-av">{{ (display_name or current_user or 'A')[:1]|upper }}</div>
+      <div class="u-av" id="headerAvatar" onclick="triggerAvatarUpload()" title="Click to change profile photo">
+        <img id="avatarImg" src="/api/profile/avatar/{{ current_user }}" onerror="this.style.display='none';document.getElementById('avatarInit').style.display='flex'" style="display:block">
+        <span class="av-init" id="avatarInit" style="display:none">{{ (display_name or current_user or 'A')[:1]|upper }}</span>
+      </div>
       <span class="u-name">{{ display_name or current_user }}</span>
     </div>
     <a class="hdr-btn btn-logout" href="/logout">⮞ Out</a>
@@ -562,6 +572,29 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
 <div id="toasts"></div>
 
 <script>
+// ── Avatar Upload ─────────────────────────────────
+function triggerAvatarUpload(){
+  const inp=document.createElement('input');
+  inp.type='file';inp.accept='image/jpeg,image/png,image/webp,image/gif';
+  inp.onchange=async(e)=>{
+    const file=e.target.files[0];if(!file)return;
+    if(file.size>5*1024*1024){toast('Max file size is 5 MB','err');return}
+    const fd=new FormData();fd.append('file',file);
+    try{
+      const r=await fetch('/api/profile/avatar',{method:'POST',body:fd});
+      const d=await r.json();
+      if(d.error){toast(d.error,'err');return}
+      const img=document.getElementById('avatarImg');
+      const init=document.getElementById('avatarInit');
+      img.src=d.url+'?t='+Date.now();
+      img.style.display='block';
+      if(init)init.style.display='none';
+      toast('✅ Profile photo updated!','ok');
+    }catch{toast('Upload failed','err')}
+  };
+  inp.click();
+}
+
 // ── Particle Canvas ───────────────────────────────
 (function(){
   const canvas=document.getElementById('canvas3d');

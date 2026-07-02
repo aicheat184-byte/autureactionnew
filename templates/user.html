@@ -57,9 +57,14 @@ header{
 .contact-btn:hover{background:rgba(0,136,204,.24)}
 .user-chip{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
   background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.22)}
-.u-av{width:20px;height:20px;border-radius:50%;
+.u-av{width:30px;height:30px;border-radius:50%;
   background:linear-gradient(135deg,var(--purple2),var(--purple));
-  display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:800;color:#fff}
+  display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:800;color:#fff;
+  overflow:hidden;cursor:pointer;transition:all .25s;flex-shrink:0;
+  border:2px solid rgba(139,92,246,.35)}
+.u-av:hover{border-color:var(--purple);box-shadow:0 0 12px rgba(139,92,246,.55)}
+.u-av img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.u-av .av-init{line-height:1;font-size:.7rem;font-weight:800}
 .u-name{font-size:.74rem;font-weight:600}
 .role-tag{font-size:.6rem;font-weight:800;padding:2px 5px;border-radius:4px;
   background:rgba(34,211,238,.12);color:var(--cyan);letter-spacing:.06em}
@@ -305,8 +310,11 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
   </div>
   <div class="hdr-right">
     <a class="contact-btn" href="{{ contact }}" target="_blank">✈️ @User_88881</a>
-    <div class="user-chip">
-      <div class="u-av">{{ (display_name or current_user or 'U')[:1]|upper }}</div>
+    <div class="u-chip">
+      <div class="u-av" onclick="triggerAvatarUpload()" title="Click to change photo">
+        <img id="avatarImg" src="/api/profile/avatar/{{ current_user }}" onerror="this.style.display='none';document.getElementById('avatarInit').style.display='flex'" style="display:block">
+        <span class="av-init" id="avatarInit" style="display:none">{{ (display_name or current_user or 'U')[:1]|upper }}</span>
+      </div>
       <span class="u-name">{{ display_name or current_user }}</span>
       <span class="role-tag">USER</span>
     </div>
@@ -517,6 +525,30 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
 
 <script>
 const MY_PHONE = '{{ my_phone or "" }}';
+
+// ── Avatar Upload ─────────────────────────────────
+function triggerAvatarUpload(){
+  const inp=document.createElement('input');
+  inp.type='file';inp.accept='image/jpeg,image/png,image/webp,image/gif';
+  inp.onchange=async(e)=>{
+    const file=e.target.files[0];if(!file)return;
+    if(file.size>5*1024*1024){toast('Max file size is 5 MB','err');return}
+    const fd=new FormData();fd.append('file',file);
+    try{
+      const r=await fetch('/api/profile/avatar',{method:'POST',body:fd});
+      const d=await r.json();
+      if(d.error){toast(d.error,'err');return}
+      const img=document.getElementById('avatarImg');
+      const init=document.getElementById('avatarInit');
+      img.src=d.url+'?t='+Date.now();
+      img.style.display='block';
+      if(init)init.style.display='none';
+      toast('✅ Profile photo updated!','ok');
+    }catch{toast('Upload failed','err')}
+  };
+  inp.click();
+}
+
 
 // ── PWA ─────────────────────────────────────────────────
 let deferredPrompt=null;
