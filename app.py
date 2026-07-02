@@ -42,6 +42,8 @@ running_bots   = {}
 pending_logins = {}
 activity_log   = []     # [{phone, emoji, msg_id, chat_id, sender, ts}, …]
 MAX_LOG        = 500
+running_bots_lock = threading.RLock()
+activity_log_lock = threading.Lock()
 
 # ── Emoji rotation counters per phone ─────────────────────
 _emoji_idx = {}
@@ -101,9 +103,10 @@ def save_config(data):
 
 
 def _get_bot_client(phone):
-    bot = running_bots.get(phone, {})
-    if bot.get('client') and bot.get('loop'):
-        return bot['client'], bot['loop']
+    with running_bots_lock:
+        bot = running_bots.get(phone)
+        if bot and bot.get('client') and bot.get('loop') and bot['loop'].is_running():
+            return bot['client'], bot['loop']
     return None, None
 
 
@@ -268,11 +271,15 @@ async def run_bot(phone, session_string):
     try:
         await client.connect()
         if not await client.is_user_authorized():
-            running_bots[phone]['status'] = 'auth_error'
+            with running_bots_lock:
+                if phone in running_bots:
+                    running_bots[phone]['status'] = 'auth_error'
             return
 
-        running_bots[phone]['client'] = client
-        running_bots[phone]['status'] = 'running'
+        with running_bots_lock:
+            if phone in running_bots:
+                running_bots[phone]['client'] = client
+                running_bots[phone]['status'] = 'running'
         _reacted = set()
 
         @client.on(events.NewMessage)
@@ -329,23 +336,25 @@ async def run_bot(phone, session_string):
                     msg_id=msg.id,
                     reaction=[ReactionEmoji(emoticon=cur_reaction)]
                 ))
-                running_bots[phone]['react_count'] = \
-                    running_bots[phone].get('react_count', 0) + 1
+                with running_bots_lock:
+                    if phone in running_bots:
+                        running_bots[phone]['react_count'] = \
+                            running_bots[phone].get('react_count', 0) + 1
                 sender = getattr(event, 'sender_id', 'ch')
                 # Log activity
-                target = acc_targets.get(target_key, {})
-                activity_log.append({
-                    'phone': phone,
-                    'emoji': cur_reaction,
-                    'msg_id': msg.id,
-                    'chat_id': event.chat_id,
-                    'topic_id': target.get('topic_id'),
-                    'topic_name': target.get('topic_name'),
-                    'sender': str(sender),
-                    'ts': datetime.utcnow().isoformat() + 'Z'
-                })
-                if len(activity_log) > MAX_LOG:
-                    activity_log.pop(0)
+                with activity_log_lock:
+                    activity_log.append({
+                        'phone': phone,
+                        'emoji': cur_reaction,
+                        'msg_id': msg.id,
+                        'chat_id': event.chat_id,
+                        'topic_id': acc_targets.get(target_key, {}).get('topic_id'),
+                        'topic_name': acc_targets.get(target_key, {}).get('topic_name'),
+                        'sender': str(sender),
+                        'ts': datetime.utcnow().isoformat() + 'Z'
+                    })
+                    if len(activity_log) > MAX_LOG:
+                        activity_log.pop(0)
                 print(f"[{phone}] {cur_reaction} #{msg.id} from={sender}")
             except FloodWaitError as e:
                 print(f"[{phone}] FloodWait {e.seconds}s")
@@ -360,8 +369,10 @@ async def run_bot(phone, session_string):
     except Exception as e:
         print(f"[Bot] {phone} error: {e}")
     finally:
-        if phone in running_bots:
-            running_bots[phone]['status'] = 'stopped'
+        with running_bots_lock:
+            if phone in running_bots:
+                running_bots[phone]['status'] = 'stopped'
+                running_bots[phone]['client'] = None
         print(f"[Bot] {phone} stopped")
 
 
@@ -373,26 +384,33 @@ def _start_bot_thread(phone, session_string):
             loop.run_until_complete(run_bot(phone, session_string))
         except Exception as e:
             print(f"[Thread] {phone}: {e}")
-            if phone in running_bots:
-                running_bots[phone]['status'] = 'error'
+            with running_bots_lock:
+                if phone in running_bots:
+                    running_bots[phone]['status'] = 'error'
     thread = threading.Thread(target=run, daemon=True)
-    running_bots[phone] = {'loop': loop, 'thread': thread,
-                           'client': None, 'status': 'starting', 'react_count': 0}
+    with running_bots_lock:
+        running_bots[phone] = {'loop': loop, 'thread': thread,
+                               'client': None, 'status': 'starting', 'react_count': 0}
     thread.start()
 
 
 def _stop_bot(phone):
-    bot = running_bots.get(phone)
-    if not bot:
-        return
-    client, loop = bot.get('client'), bot.get('loop')
-    if client and loop and loop.is_running():
-        try:
-            asyncio.run_coroutine_threadsafe(client.disconnect(), loop).result(timeout=5)
-        except Exception:
-            pass
-    if phone in running_bots:
-        running_bots[phone]['status'] = 'stopped'
+    with running_bots_lock:
+        bot = running_bots.get(phone)
+        if not bot:
+            return
+        client, loop = bot.get('client'), bot.get('loop')
+        if client and loop and loop.is_running():
+            try:
+                asyncio.run_coroutine_threadsafe(client.disconnect(), loop).result(timeout=5)
+            except Exception:
+                pass
+            try:
+                loop.call_soon_threadsafe(loop.stop)
+            except Exception:
+                pass
+        bot['status'] = 'stopped'
+        bot['client'] = None
 
 
 # ══════════════════════════════════════════════════════════
@@ -556,7 +574,8 @@ def api_activity():
     """Recent reaction activity log."""
     limit = min(int(request.args.get('limit', 50)), MAX_LOG)
     visible = get_visible_accounts()
-    logs = [e for e in reversed(activity_log) if e['phone'] in visible][:limit]
+    with activity_log_lock:
+        logs = [e.copy() for e in reversed(activity_log) if e['phone'] in visible][:limit]
     # Enrich with account name
     accounts = load_accounts()
     targets  = load_targets()
@@ -594,7 +613,9 @@ def api_stats():
     # Timeline: group activity_log by minute (last 60 min)
     from collections import defaultdict
     timeline = defaultdict(int)
-    for entry in activity_log:
+    with activity_log_lock:
+        timeline_source = list(activity_log)
+    for entry in timeline_source:
         if entry['phone'] in visible:
             minute_key = entry['ts'][:16]  # YYYY-MM-DDTHH:MM
             timeline[minute_key] += 1
@@ -836,7 +857,8 @@ def export_activity():
     visible  = get_visible_accounts()
     accounts = load_accounts()
     targets  = load_targets()
-    logs     = [e for e in reversed(activity_log) if e['phone'] in visible]
+    with activity_log_lock:
+        logs = [e.copy() for e in reversed(activity_log) if e['phone'] in visible]
     output   = io.StringIO()
     writer   = csv.DictWriter(output, fieldnames=[
         'ts', 'phone', 'acc_name', 'emoji', 'msg_id', 'chat_id', 'target_name', 'sender'
@@ -1092,7 +1114,9 @@ def send_code():
 @app.route('/api/login/verify-otp', methods=['POST'])
 @login_required
 def verify_otp():
-    data, phone, code = request.json, request.json.get('phone','').strip(), request.json.get('code','').strip()
+    body = request.json or {}
+    phone = body.get('phone','').strip()
+    code  = body.get('code','').strip()
     p = pending_logins.get(phone)
     if not p:
         return jsonify({'error': 'Session expired. Resend code.'}), 400
@@ -1112,7 +1136,9 @@ def verify_otp():
 @app.route('/api/login/verify-2fa', methods=['POST'])
 @login_required
 def verify_2fa():
-    data, phone, password = request.json, request.json.get('phone','').strip(), request.json.get('password','').strip()
+    body     = request.json or {}
+    phone    = body.get('phone','').strip()
+    password = body.get('password','').strip()
     p = pending_logins.get(phone)
     if not p:
         return jsonify({'error': 'Session expired'}), 400
