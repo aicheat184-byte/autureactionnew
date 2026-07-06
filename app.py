@@ -4,7 +4,7 @@ import json
 import os
 import csv
 import io
-from datetime import datetime, time as dtime
+from datetime import datetime, time as dtime, timedelta
 from functools import wraps
 from flask import Flask, render_template, request, jsonify, session, redirect, Response, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -20,6 +20,7 @@ from telethon.errors import (
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'cheatz-autoreact-secure-2026')
+app.permanent_session_lifetime = timedelta(days=30)
 
 # ── Config ─────────────────────────────────────────────────
 API_ID        = 2040
@@ -116,7 +117,14 @@ def _fetch_forum_topics(client, loop, chat_id, limit=50):
             client.get_entity(chat_id), loop
         ).result(timeout=15)
         result = asyncio.run_coroutine_threadsafe(
-            client(GetForumTopicsRequest(entity, None, 0, 0, limit)),
+            client(GetForumTopicsRequest(
+                channel=entity,
+                q=None,
+                offset_date=0,
+                offset_id=0,
+                offset_topic=0,
+                limit=limit
+            )),
             loop
         ).result(timeout=20)
         topics = []
@@ -1232,7 +1240,10 @@ def autostart():
 
 
 # ── Module-level autostart (runs under gunicorn/waitress too) ──────────────────
-autostart()
+# Guard against running twice when gunicorn pre-forks workers
+if not os.environ.get('_AUTOREACT_STARTED'):
+    os.environ['_AUTOREACT_STARTED'] = '1'
+    autostart()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=PORT, debug=False)

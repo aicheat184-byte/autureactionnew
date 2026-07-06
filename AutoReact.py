@@ -39,10 +39,10 @@ SESSION_STRING = os.environ.get('SESSION_STRING', '')
 
 if SESSION_STRING:
     print("[*] Using StringSession from environment variable")
-    session = StringSession(SESSION_STRING)
+    tg_session = StringSession(SESSION_STRING)
 else:
     print("[*] Using local session file: session_autoreact")
-    session = 'session_autoreact'
+    tg_session = 'session_autoreact'
 
 # ====================================================
 # Flask Web Server (keeps Render Web Service alive)
@@ -58,13 +58,13 @@ def health():
     return 'OK', 200
 
 def run_flask():
-    app.run(host='0.0.0.0', port=PORT)
+    app.run(host='0.0.0.0', port=PORT, threaded=True, use_reloader=False)
 
 # ====================================================
 # Telethon Bot
 # ====================================================
 client = TelegramClient(
-    session, API_ID, API_HASH,
+    tg_session, API_ID, API_HASH,
     device_model     = 'Desktop',
     system_version   = 'Windows 10',
     app_version      = '5.3.1',
