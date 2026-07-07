@@ -167,17 +167,31 @@ main{flex:1;padding:28px 20px;max-width:680px;margin:0 auto;width:100%}
   cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif}
 .add-btn:hover{background:rgba(139,92,246,.24)}
 .target-pills{display:flex;flex-wrap:wrap;gap:7px}
-.tpill{display:inline-flex;align-items:center;gap:6px;
-  padding:6px 10px 6px 12px;border-radius:999px;
+.tpill{display:inline-flex;align-items:center;gap:5px;
+  padding:5px 8px 5px 10px;border-radius:999px;
   background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);
   font-size:.8rem;font-weight:600;color:var(--cyan);animation:sin .3s ease}
-.tpill-name{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tpill-emo{font-size:.9rem;cursor:pointer;padding:0 2px;border-radius:5px;
+  border:none;background:transparent;transition:background .2s;line-height:1;
+  display:flex;align-items:center}
+.tpill-emo:hover{background:rgba(139,92,246,.25)}
+.tpill-name{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tpill-del{width:16px;height:16px;border-radius:50%;border:none;
   background:rgba(244,63,94,.15);color:#f43f5e;cursor:pointer;font-size:.62rem;
   display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
 .tpill-del:hover{background:rgba(244,63,94,.32)}
 .t-empty{font-size:.82rem;color:rgba(148,163,184,.45);font-style:italic}
 @keyframes sin{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* Per-target emoji modal */
+.temo-grid{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px}
+.temo-btn{width:34px;height:34px;border-radius:8px;border:1px solid transparent;
+  background:rgba(255,255,255,.05);cursor:pointer;font-size:1rem;
+  display:flex;align-items:center;justify-content:center;transition:all .18s;padding:0}
+.temo-btn:hover{background:rgba(139,92,246,.18);border-color:rgba(139,92,246,.4);transform:scale(1.18)}
+.temo-btn.sel{background:rgba(139,92,246,.3);border-color:var(--purple);box-shadow:0 0 12px rgba(139,92,246,.4)}
+.temo-cur{font-size:.78rem;color:var(--muted);margin-bottom:10px}
+.temo-cur span{color:var(--purple);font-weight:700}
 
 /* EMOJI */
 .emoji-grid{display:flex;flex-wrap:wrap;gap:5px}
@@ -393,6 +407,7 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
     {% if my_account.targets %}
       {% for key, t in my_account.targets.items() %}
       <span class="tpill" id="tp-{{ key }}">
+        <button class="tpill-emo" title="Set emoji for this target" onclick="openTgtEmoModal('{{ key }}','{{ t.emoji if t.emoji else '' }}')">{{ t.emoji if t.emoji else '🙏' }}</button>
         <span class="tpill-name" title="{{ t.id }}">{{ t.name }}{% if t.topic_name %} · {{ t.topic_name }}{% endif %}</span>
         <button class="tpill-del" onclick="removeTarget('{{ key }}')">✕</button>
       </span>
@@ -526,6 +541,22 @@ footer span{background:linear-gradient(135deg,var(--gold),#fde68a);
   <button class="btn-prim" id="bAddTgt" onclick="addTarget()">Add Target</button>
 </div>
 </div>
+
+<!-- PER-TARGET EMOJI MODAL -->
+<div class="overlay" id="tgtEmoOverlay" onclick="if(event.target.id==='tgtEmoOverlay')closeTgtEmoModal()">
+<div class="modal" style="width:min(340px,100%)">
+  <div class="mhd"><span class="mtitle">🎯 Target Reaction Emoji</span>
+    <button class="mx" onclick="closeTgtEmoModal()">✕</button></div>
+  <div class="temo-cur">Current: <span id="temoCurrentLabel">🙏</span></div>
+  <div class="temo-grid" id="temoGrid">
+    {% set emojis=['🙏','👍','❤️','🔥','🥰','👏','😁','🤔','🤯','😱','🎉','🤩','💯','🤣','⚡','🏆','😍','💔','😢','🤬','💩','🤮','🕊','👌','🌚','🍾','💋','😈','😴','😭','🤓','👻','🤝','🫡','😇','😨','💅','🗿','🆒','🦄','😎','👾','🎃','🐳','🌭','🍌','🍓','🤡','🥴','🥱'] %}
+    {% for e in emojis %}
+    <button class="temo-btn" data-emo="{{ e }}" onclick="pickTgtEmo('{{ e }}')">{{ e }}</button>
+    {% endfor %}
+  </div>
+  <button class="btn-prim" onclick="saveTgtEmo()">Save Emoji ✓</button>
+</div>
+</div>
 {% endif %}
 
 <div id="toasts"></div>
@@ -633,7 +664,7 @@ async function addTarget(){
     document.getElementById('t-empty')?.remove();
     const spanTitle=d.topic_name?`${d.name} · ${d.topic_name}`:d.name;
     const p=document.createElement('span');p.className='tpill';p.id=`tp-${d.key}`;
-    p.innerHTML=`<span class="tpill-name" title="${d.id}">${spanTitle}</span>
+    p.innerHTML=`<button class="tpill-emo" title="Set emoji for this target" onclick="openTgtEmoModal('${d.key}','')">🙏</button><span class="tpill-name" title="${d.id}">${spanTitle}</span>
       <button class="tpill-del" onclick="removeTarget('${d.key}')">✕</button>`;
     pills.appendChild(p);
     const cnt=document.getElementById('targetCount');
@@ -699,6 +730,42 @@ async function setEmoji(e){
     document.querySelectorAll('.emo').forEach(b=>b.classList.toggle('sel',b.textContent===e));
     toast(`Your reaction → ${e}`,'ok');
   }catch{toast('Error','err')}
+}
+
+// ── Per-Target Emoji Modal ────────────────────────────────
+let _temoKey='',_temoSelected='';
+function openTgtEmoModal(key,cur){
+  _temoKey=key;
+  _temoSelected=cur||'🙏';
+  document.getElementById('temoCurrentLabel').textContent=_temoSelected;
+  document.querySelectorAll('.temo-btn').forEach(b=>b.classList.toggle('sel',b.dataset.emo===_temoSelected));
+  document.getElementById('tgtEmoOverlay').classList.add('on');
+}
+function closeTgtEmoModal(){
+  document.getElementById('tgtEmoOverlay').classList.remove('on');
+}
+function pickTgtEmo(e){
+  _temoSelected=e;
+  document.getElementById('temoCurrentLabel').textContent=e;
+  document.querySelectorAll('.temo-btn').forEach(b=>b.classList.toggle('sel',b.dataset.emo===e));
+}
+async function saveTgtEmo(){
+  if(!MY_PHONE){toast('No account linked','err');return}
+  try{
+    const r=await fetch(`/api/accounts/${encodeURIComponent(MY_PHONE)}/targets/${encodeURIComponent(_temoKey)}/emoji`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({emoji:_temoSelected})});
+    const d=await r.json();
+    if(d.error){toast(d.error,'err');return}
+    // Update the pill emoji button
+    const pill=document.getElementById(`tp-${_temoKey}`);
+    if(pill){
+      const emoBtn=pill.querySelector('.tpill-emo');
+      if(emoBtn)emoBtn.textContent=_temoSelected;
+    }
+    closeTgtEmoModal();
+    toast(`✅ Target emoji → ${_temoSelected}`,'ok');
+  }catch{toast('Error saving emoji','err')}
 }
 
 // ── Poll ─────────────────────────────────────────────────
